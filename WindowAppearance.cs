@@ -32,7 +32,8 @@ public partial class MainWindow
         sizing.MaxPosition.Y=info.Work.Top-info.Monitor.Top;
         sizing.MaxSize.X=info.Work.Right-info.Work.Left;
         sizing.MaxSize.Y=info.Work.Bottom-info.Work.Top;
-        sizing.MaxTrackSize=sizing.MaxSize;
+        // Do not constrain the largest normal window to the work area: the player
+        // uses an explicitly sized borderless normal window to cover the taskbar.
         Marshal.StructureToPtr(sizing,lParam,false);
         handled=true;
         return IntPtr.Zero;
