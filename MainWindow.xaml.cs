@@ -26,6 +26,8 @@ public partial class MainWindow : Window
     {
         var vlcPath = Path.Combine(AppContext.BaseDirectory, "libvlc", Environment.Is64BitProcess ? "win-x64" : "win-x86");
         Core.Initialize(vlcPath); InitializeComponent();
+        EpisodeBox.IsSynchronizedWithCurrentItem = false;
+        FullscreenEpisodeBox.IsSynchronizedWithCurrentItem = false;
         SourceInitialized += (_, _) => InstallWindowSizingHook();
         // BitmapImage(ICO) selects its first 16px frame; use a high-resolution
         // window image independently of the multi-size Explorer/shortcut icon.
@@ -169,8 +171,10 @@ public partial class MainWindow : Window
     {
         var index = episodes.ToList().FindIndex(item => ReferenceEquals(item, episode) || item.Key == episode.Key);
         if (index < 0) return;
+        var item = episodes[index];
         syncingSelectors = true;
-        EpisodeBox.SelectedIndex = FullscreenEpisodeBox.SelectedIndex = index;
+        EpisodeBox.SelectedItem = item;
+        FullscreenEpisodeBox.SelectedItem = item;
         syncingSelectors = false;
     }
     async Task MoveEpisodeAsync(int direction)
