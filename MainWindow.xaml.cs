@@ -19,7 +19,7 @@ public partial class MainWindow : Window
     readonly ObservableCollection<GenreFilterItem> genreFilters = [];
     GenreDefinition? activeGenre;
     readonly string statePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AniTV", "state.json");
-    UserState state = new(); Anime? selected; IReadOnlyList<VostEpisode> episodes = []; bool isPlaying; bool changingSource; bool syncingSelectors; bool syncingVolume; bool videoStarted; bool isSeeking; long seekTarget = -1; int seekVersion; DateTime seekStartedAt; Slider? activeSeekSlider; readonly DispatcherTimer playbackTimer = new() { Interval = TimeSpan.FromMilliseconds(500) }; readonly DispatcherTimer controlsTimer = new() { Interval = TimeSpan.FromSeconds(2.5) };
+    UserState state = new(); Anime? selected; IReadOnlyList<VostEpisode> episodes = []; VostEpisode? selectedEpisode; bool isPlaying; bool changingSource; bool syncingSelectors; bool syncingVolume; bool videoStarted; bool isSeeking; long seekTarget = -1; int seekVersion; DateTime seekStartedAt; Slider? activeSeekSlider; readonly DispatcherTimer playbackTimer = new() { Interval = TimeSpan.FromMilliseconds(500) }; readonly DispatcherTimer controlsTimer = new() { Interval = TimeSpan.FromSeconds(2.5) };
     readonly LibVLC libVlc; readonly MediaPlayer mediaPlayer; Media? currentMedia;
     WindowState stateBeforeFullscreen; WindowStyle styleBeforeFullscreen; ResizeMode resizeBeforeFullscreen; Rect boundsBeforeFullscreen; bool topmostBeforeFullscreen; bool isFullscreen;
     public MainWindow()
@@ -127,7 +127,8 @@ public partial class MainWindow : Window
             foreach (var ep in episodes) ep.IsWatched = progress.Watched.Contains(ep.Key);
             PlayerTitle.Text = FullscreenTitle.Text = selected.Title; ProviderText.Text = playbackSource!.Name;
             UpdateSourceSelectors();
-            syncingSelectors = true; EpisodeBox.ItemsSource = FullscreenEpisodeBox.ItemsSource = episodes; EpisodeBox.SelectedIndex = FullscreenEpisodeBox.SelectedIndex = index; syncingSelectors = false;
+            syncingSelectors = true; EpisodeBox.ItemsSource = FullscreenEpisodeBox.ItemsSource = episodes; syncingSelectors = false;
+            SyncEpisodeSelectors(episodes[index]);
             PlayerOverlay.Visibility = Visibility.Visible; await PrepareEpisodeAsync(episodes[index], resume);
         }
         catch (OperationCanceledException) { }
@@ -140,7 +141,7 @@ public partial class MainWindow : Window
         PlayerLoadingText.Text = resumeSeconds > 0 ? "Возобновляем просмотр…" : "Подключаемся к видео…";
         PlayerLoading.Visibility = Visibility.Visible;
         playbackTimer.Stop(); mediaPlayer.Stop(); currentMedia?.Dispose(); AttachVideoSurface();
-        activeAnime = selected; activeEpisode = episode; activeEnded = false; pendingResumeSeconds = resumeSeconds; isSeeking = false; seekTarget = -1; seekVersion++;
+        activeAnime = selected; activeEpisode = selectedEpisode = episode; SyncEpisodeSelectors(episode); activeEnded = false; pendingResumeSeconds = resumeSeconds; isSeeking = false; seekTarget = -1; seekVersion++;
         var url = (QualityBox.SelectedItem as StreamQuality)?.Url ?? episode.HdUrl; currentMedia = new Media(libVlc, url); currentMedia.AddOption(":http-referrer=" + episode.Referrer); currentMedia.AddOption(":network-caching=1500");
         if (resumeSeconds > 0) currentMedia.AddOption(":start-time=" + resumeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
         PositionSlider.Value = 0; TimeText.Text = "00:00 / 00:00"; PlayerLoading.Visibility = Visibility.Visible; PlayerLoadingText.Text = resumeSeconds > 0 ? "Возобновляем просмотр…" : "Подключаемся к видео…"; mediaPlayer.Play(currentMedia); isPlaying = true; PlayPauseButton.Content = "Ⅱ"; changingSource = false;
@@ -160,14 +161,21 @@ public partial class MainWindow : Window
     {
         if (index < 0 || index >= episodes.Count) return;
         var target = episodes[index];
+        selectedEpisode = target;
+        SyncEpisodeSelectors(target);
+        await PrepareEpisodeAsync(target);
+    }
+    void SyncEpisodeSelectors(VostEpisode episode)
+    {
+        var index = episodes.ToList().FindIndex(item => ReferenceEquals(item, episode) || item.Key == episode.Key);
+        if (index < 0) return;
         syncingSelectors = true;
         EpisodeBox.SelectedIndex = FullscreenEpisodeBox.SelectedIndex = index;
         syncingSelectors = false;
-        await PrepareEpisodeAsync(target);
     }
     async Task MoveEpisodeAsync(int direction)
     {
-        var current = EpisodeBox.SelectedItem as VostEpisode ?? activeEpisode;
+        var current = selectedEpisode ?? EpisodeBox.SelectedItem as VostEpisode ?? activeEpisode;
         var index = EpisodeNavigation.AdjacentIndex(episodes, current, direction);
         if (index >= 0) await SelectEpisodeAsync(index);
     }
@@ -205,7 +213,7 @@ public partial class MainWindow : Window
     async void VideoPlayer_MediaEnded()
     {
         CaptureProgress(true);
-        var next = EpisodeNavigation.AdjacentIndex(episodes, EpisodeBox.SelectedItem as VostEpisode ?? activeEpisode, 1);
+        var next = EpisodeNavigation.AdjacentIndex(episodes, selectedEpisode ?? EpisodeBox.SelectedItem as VostEpisode ?? activeEpisode, 1);
         if (next >= 0) await SelectEpisodeAsync(next);
         else { isPlaying = false; PlayPauseButton.Content = FullscreenPlayPauseButton.Content = "▶"; }
     }

@@ -65,7 +65,7 @@ public partial class MainWindow
         mediaPlayer.Stop();
         mediaPlayer.Media = null;
         currentMedia?.Dispose(); currentMedia = null;
-        activeAnime = null; activeEpisode = null;
+        activeAnime = null; activeEpisode = selectedEpisode = null;
         isPlaying = false; videoStarted = false;
         syncingSelectors = true;
         EpisodeBox.ItemsSource = FullscreenEpisodeBox.ItemsSource = null;

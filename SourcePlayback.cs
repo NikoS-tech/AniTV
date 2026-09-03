@@ -74,6 +74,7 @@ public partial class MainWindow
             syncingSelectors = true;
             EpisodeBox.SelectedItem = FullscreenEpisodeBox.SelectedItem = activeEpisode;
             syncingSelectors = false;
+            selectedEpisode = activeEpisode;
         }
         finally
         {
@@ -104,8 +105,9 @@ public partial class MainWindow
             foreach (var ep in list) ep.IsWatched = ProgressFor(anime).Watched.Contains(ep.Key);
             syncingSelectors = true;
             EpisodeBox.ItemsSource = FullscreenEpisodeBox.ItemsSource = episodes;
-            EpisodeBox.SelectedIndex = FullscreenEpisodeBox.SelectedIndex = index;
             syncingSelectors = false;
+            selectedEpisode = episodes[index];
+            SyncEpisodeSelectors(selectedEpisode);
             UpdateSourceSelectors(); ProviderText.Text = source.Name;
             // Do not transfer timestamps between differently edited releases.
             var resume = ProgressFor(anime).SourcePositions.GetValueOrDefault(source.Key + "/" + episodes[index].Key);
