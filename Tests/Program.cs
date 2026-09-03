@@ -46,6 +46,9 @@ Check((await pager.TakeAsync(20)).Select(a => a.Id).SequenceEqual(Enumerable.Ran
 Check((await pager.TakeAsync(20)).Count == 6 && !pager.HasMore, "Final batch stops pagination");
 var repeated = new CatalogPager((_, _) => Task.FromResult(new List<Anime> { new() { Id = 1 } }));
 Check((await repeated.TakeAsync(50)).Count == 1 && !repeated.HasMore, "Repeated pages do not loop");
+var reversedEpisodes = new[] { 3, 2, 1 }.Select(n => new VostEpisode($"{n} серия", new Uri($"https://example.org/{n}"), new Uri($"https://example.org/{n}"), null)).ToList();
+Check(EpisodeNavigation.AdjacentIndex(reversedEpisodes, reversedEpisodes[1], 1) == 0, "Next episode follows the greater episode number even in reversed source order");
+Check(EpisodeNavigation.AdjacentIndex(reversedEpisodes, reversedEpisodes[1], -1) == 2, "Previous episode follows the smaller episode number even in reversed source order");
 if (args.Contains("--live-catalog"))
 {
     var livePager = new CatalogPager(new AnimeVostProvider().GetCatalogPageAsync);

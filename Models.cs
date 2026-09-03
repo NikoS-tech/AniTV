@@ -185,3 +185,25 @@ public static class PlaybackChoice
         return (index,same ? p.PositionSeconds : p.SourcePositions.GetValueOrDefault(source+"/"+episodes[index].Key));
     }
 }
+
+public static class EpisodeNavigation
+{
+    public static int AdjacentIndex(IReadOnlyList<VostEpisode> episodes, VostEpisode? current, int direction)
+    {
+        if (episodes.Count == 0 || direction == 0) return -1;
+        var currentIndex = current is null ? -1 : episodes.ToList().FindIndex(e => ReferenceEquals(e, current) || e.Key == current.Key);
+        if (currentIndex < 0) return direction > 0 ? 0 : episodes.Count - 1;
+
+        var currentNumber = episodes[currentIndex].Number;
+        if (currentNumber > 0)
+        {
+            var numbered = episodes.Select((episode, index) => (episode.Number, index)).Where(x => x.Number > 0);
+            return direction > 0
+                ? numbered.Where(x => x.Number > currentNumber).OrderBy(x => x.Number).Select(x => x.index).DefaultIfEmpty(-1).First()
+                : numbered.Where(x => x.Number < currentNumber).OrderByDescending(x => x.Number).Select(x => x.index).DefaultIfEmpty(-1).First();
+        }
+
+        var adjacent = currentIndex + Math.Sign(direction);
+        return adjacent >= 0 && adjacent < episodes.Count ? adjacent : -1;
+    }
+}

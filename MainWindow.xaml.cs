@@ -147,14 +147,32 @@ public partial class MainWindow : Window
     }
     async void EpisodeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (syncingSelectors || sender is not ComboBox box || box.SelectedIndex < 0 || box.SelectedIndex >= episodes.Count) return; syncingSelectors = true; if (box == EpisodeBox) FullscreenEpisodeBox.SelectedIndex = box.SelectedIndex; else EpisodeBox.SelectedIndex = box.SelectedIndex; syncingSelectors = false; await PrepareEpisodeAsync(episodes[box.SelectedIndex]);
+        if (syncingSelectors || sender is not ComboBox box) return;
+        var index = box.SelectedIndex;
+        if (index < 0 || index >= episodes.Count) return;
+        await SelectEpisodeAsync(index);
     }
     void QualityBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!IsLoaded || syncingSelectors || changingSource || sender is not ComboBox box || EpisodeBox.SelectedItem is not VostEpisode episode || PlayerOverlay.Visibility != Visibility.Visible) return; syncingSelectors = true; if (box == QualityBox) FullscreenQualityBox.SelectedIndex = box.SelectedIndex; else QualityBox.SelectedIndex = box.SelectedIndex; syncingSelectors = false; var position = mediaPlayer.Time; PlayEpisode(episode, Math.Max(0, position / 1000d));
     }
-    void PreviousEpisode_Click(object sender, RoutedEventArgs e) { if (EpisodeBox.SelectedIndex > 0) EpisodeBox.SelectedIndex--; }
-    void NextEpisode_Click(object sender, RoutedEventArgs e) { if (EpisodeBox.SelectedIndex + 1 < episodes.Count) EpisodeBox.SelectedIndex++; }
+    async Task SelectEpisodeAsync(int index)
+    {
+        if (index < 0 || index >= episodes.Count) return;
+        var target = episodes[index];
+        syncingSelectors = true;
+        EpisodeBox.SelectedIndex = FullscreenEpisodeBox.SelectedIndex = index;
+        syncingSelectors = false;
+        await PrepareEpisodeAsync(target);
+    }
+    async Task MoveEpisodeAsync(int direction)
+    {
+        var current = EpisodeBox.SelectedItem as VostEpisode ?? activeEpisode;
+        var index = EpisodeNavigation.AdjacentIndex(episodes, current, direction);
+        if (index >= 0) await SelectEpisodeAsync(index);
+    }
+    async void PreviousEpisode_Click(object sender, RoutedEventArgs e) => await MoveEpisodeAsync(-1);
+    async void NextEpisode_Click(object sender, RoutedEventArgs e) => await MoveEpisodeAsync(1);
     void PlayPause_Click(object sender, RoutedEventArgs e) { if (!PlayerActive) return; CaptureProgress(); if (isPlaying) mediaPlayer.Pause(); else mediaPlayer.Play(); isPlaying = !isPlaying; var icon = isPlaying ? "Ⅱ" : "▶"; PlayPauseButton.Content = icon; FullscreenPlayPauseButton.Content = icon; }
     void VideoSurface_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { if (!PlayerActive) return; if (e.ClickCount >= 2) ToggleFullscreen(); else PlayPause_Click(sender, e); }
     void ToggleFullscreen_Click(object sender, RoutedEventArgs e) => ToggleFullscreen();
@@ -184,7 +202,13 @@ public partial class MainWindow : Window
     void RevealFullscreenControls() { if (!PlayerActive || !isFullscreen) return; SetFullscreenControls(true); controlsTimer.Stop(); controlsTimer.Start(); }
     void SetFullscreenControls(bool visible) { PlayerHeader.Visibility = Visibility.Collapsed; PlayerControls.Visibility = Visibility.Collapsed; FullscreenChrome.Visibility = visible ? Visibility.Visible : Visibility.Collapsed; Mouse.OverrideCursor = visible ? null : Cursors.None; }
     void ClosePlayer_Click(object sender, RoutedEventArgs e) { StopPlayerSession(); if (libraryMode) ShowLibrary(); }
-    void VideoPlayer_MediaEnded() { CaptureProgress(true); if (EpisodeBox.SelectedIndex + 1 < EpisodeBox.Items.Count) EpisodeBox.SelectedIndex++; else { isPlaying = false; PlayPauseButton.Content = "▶"; } }
+    async void VideoPlayer_MediaEnded()
+    {
+        CaptureProgress(true);
+        var next = EpisodeNavigation.AdjacentIndex(episodes, EpisodeBox.SelectedItem as VostEpisode ?? activeEpisode, 1);
+        if (next >= 0) await SelectEpisodeAsync(next);
+        else { isPlaying = false; PlayPauseButton.Content = FullscreenPlayPauseButton.Content = "▶"; }
+    }
     void PlaybackTimer_Tick(object? sender, EventArgs e) { UpdatePlaybackDisplay(); if (DateTime.UtcNow - lastCheckpoint >= TimeSpan.FromSeconds(5)) CaptureProgress(); }
     void UpdatePlaybackDisplay() { if (mediaPlayer.Length <= 0) return; if (!isSeeking) { PositionSlider.Maximum = FullscreenPositionSlider.Maximum = mediaPlayer.Length / 1000d; PositionSlider.Value = FullscreenPositionSlider.Value = mediaPlayer.Time / 1000d; } var text = $"{FormatTime(TimeSpan.FromMilliseconds(mediaPlayer.Time))} / {FormatTime(TimeSpan.FromMilliseconds(mediaPlayer.Length))}"; TimeText.Text = FullscreenTimeText.Text = text; }
     void PositionSlider_MouseDown(object sender, MouseButtonEventArgs e)
