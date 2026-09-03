@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - run: dotnet restore Tests/WatchTests.csproj --configfile NuGet.Config
+      - run: dotnet run --project Tests/WatchTests.csproj --no-restore
+
+  build:
+    needs: test
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        rid: [win-x64, win-x86]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Publish ${{ matrix.rid }}
+        shell: pwsh
+        run: |
+          $output = Join-Path $PWD "artifacts/${{ matrix.rid }}"
+          dotnet publish AniTV.csproj -c Release -r "${{ matrix.rid }}" --self-contained true -o $output
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $libvlcRoot = (Resolve-Path (Join-Path $output "libvlc")).Path
+          $remove = if ("${{ matrix.rid }}" -eq "win-x64") { @("win-x86", "win-arm64") } else { @("win-x64", "win-arm64") }
+          foreach ($architecture in $remove) {
+            $target = Join-Path $libvlcRoot $architecture
+            if (Test-Path -LiteralPath $target) {
+              $resolved = (Resolve-Path -LiteralPath $target).Path
+              if (-not $resolved.StartsWith($libvlcRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Unsafe LibVLC cleanup target: $resolved"
+              }
+              Remove-Item -LiteralPath $resolved -Recurse -Force
+            }
+          }
+
+          $archive = Join-Path $PWD "AniTV-${{ github.ref_name }}-${{ matrix.rid }}.zip"
+          Compress-Archive -Path (Join-Path $output "*") -DestinationPath $archive -CompressionLevel Optimal
+          $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $([IO.Path]::GetFileName($archive))" | Set-Content -Encoding ascii "AniTV-${{ github.ref_name }}-${{ matrix.rid }}.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AniTV-${{ matrix.rid }}
+          path: |
+            AniTV-${{ github.ref_name }}-${{ matrix.rid }}.zip
+            AniTV-${{ github.ref_name }}-${{ matrix.rid }}.sha256
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" release-assets/* --title "AniTV ${GITHUB_REF_NAME}" --generate-notes
+

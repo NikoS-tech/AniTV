@@ -1,0 +1,16 @@
+bin/
+obj/
+publish/
+artifacts/
+dist/
+.appdata/
+.dotnet-home/
+.tmp-doc-review/
+.vs/
+Tests/**/bin/
+Tests/**/obj/
+*.user
+*.suo
+*.log
+*.tmp
+
