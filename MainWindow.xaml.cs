@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     {
         var vlcPath = Path.Combine(AppContext.BaseDirectory, "libvlc", Environment.Is64BitProcess ? "win-x64" : "win-x86");
         Core.Initialize(vlcPath); InitializeComponent();
+        SourceInitialized += (_, _) => InstallWindowSizingHook();
         // BitmapImage(ICO) selects its first 16px frame; use a high-resolution
         // window image independently of the multi-size Explorer/shortcut icon.
         var windowIcon = new BitmapImage();

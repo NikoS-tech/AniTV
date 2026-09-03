@@ -2,7 +2,12 @@
   <Application.Resources>
     <Style x:Key="CaptionButton" TargetType="Button">
       <Setter Property="Width" Value="42"/><Setter Property="Height" Value="30"/><Setter Property="Foreground" Value="#A6ADBF"/><Setter Property="Background" Value="Transparent"/><Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="ToolTipService.InitialShowDelay" Value="450"/><Setter Property="ToolTipService.ShowDuration" Value="5000"/><Setter Property="ToolTipService.BetweenShowDelay" Value="100"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="CaptionBackground" CornerRadius="7" Background="{TemplateBinding Background}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="CaptionBackground" Property="Background" Value="#303448"/><Setter Property="Foreground" Value="White"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="CaptionBackground" Property="Background" Value="#44325F"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="ToolTip">
+      <Setter Property="OverridesDefaultStyle" Value="True"/><Setter Property="Foreground" Value="#F1F2F7"/><Setter Property="Background" Value="#202432"/><Setter Property="BorderBrush" Value="#464C61"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Padding" Value="10,7"/><Setter Property="FontSize" Value="12"/><Setter Property="HasDropShadow" Value="True"/><Setter Property="Placement" Value="Bottom"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToolTip"><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7" Padding="{TemplateBinding Padding}"><Border.Effect><DropShadowEffect Color="#000000" BlurRadius="12" ShadowDepth="3" Opacity="0.45"/></Border.Effect><ContentPresenter Content="{TemplateBinding Content}" TextElement.Foreground="{TemplateBinding Foreground}"/></Border></ControlTemplate></Setter.Value></Setter>
     </Style>
     <Style x:Key="LoadingSpinner" TargetType="ContentControl">
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ContentControl">

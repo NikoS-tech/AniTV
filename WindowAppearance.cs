@@ -8,10 +8,35 @@ namespace AniTV;
 public partial class MainWindow
 {
     const uint MonitorDefaultToNearest = 2;
+    const int WmGetMinMaxInfo = 0x0024;
+    [StructLayout(LayoutKind.Sequential)] struct NativePoint { public int X,Y; }
+    [StructLayout(LayoutKind.Sequential)] struct MinMaxInfo { public NativePoint Reserved,MaxSize,MaxPosition,MinTrackSize,MaxTrackSize; }
     [StructLayout(LayoutKind.Sequential)] struct NativeRect { public int Left,Top,Right,Bottom; }
     [StructLayout(LayoutKind.Sequential)] struct MonitorInfo { public int Size; public NativeRect Monitor,Work; public uint Flags; }
     [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr window,uint flags);
     [DllImport("user32.dll",CharSet=CharSet.Auto)] static extern bool GetMonitorInfo(IntPtr monitor,ref MonitorInfo info);
+
+    void InstallWindowSizingHook()
+    {
+        if(PresentationSource.FromVisual(this) is HwndSource source) source.AddHook(WindowSizingHook);
+    }
+
+    IntPtr WindowSizingHook(IntPtr window,int message,IntPtr wParam,IntPtr lParam,ref bool handled)
+    {
+        if(message!=WmGetMinMaxInfo) return IntPtr.Zero;
+        var monitor=MonitorFromWindow(window,MonitorDefaultToNearest);
+        var info=new MonitorInfo { Size=Marshal.SizeOf<MonitorInfo>() };
+        if(monitor==IntPtr.Zero || !GetMonitorInfo(monitor,ref info)) return IntPtr.Zero;
+        var sizing=Marshal.PtrToStructure<MinMaxInfo>(lParam);
+        sizing.MaxPosition.X=info.Work.Left-info.Monitor.Left;
+        sizing.MaxPosition.Y=info.Work.Top-info.Monitor.Top;
+        sizing.MaxSize.X=info.Work.Right-info.Work.Left;
+        sizing.MaxSize.Y=info.Work.Bottom-info.Work.Top;
+        sizing.MaxTrackSize=sizing.MaxSize;
+        Marshal.StructureToPtr(sizing,lParam,false);
+        handled=true;
+        return IntPtr.Zero;
+    }
 
     Rect CurrentMonitorBounds()
     {
