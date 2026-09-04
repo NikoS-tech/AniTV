@@ -99,6 +99,7 @@ public partial class MainWindow
 
     void ShowLibrary()
     {
+        ShowCatalogContent();
         PageTitle.Text = completedMode ? "Просмотрено" : "Продолжить просмотр";
         Subtitle.Text = completedMode ? "Полностью просмотренные сезоны · Сначала последние по дате просмотра" : "Последняя серия и позиция · ✓ — просмотренные серии · НОВИНКА — новая, ещё не начатая серия";
         var titles = state.Titles.Values.Where(a => state.Progress.TryGetValue(a.Id, out var p) && (completedMode ? p.IsComplete(a) : p.Started.Count > 0 && !p.HiddenFromContinue && !p.IsComplete(a)))

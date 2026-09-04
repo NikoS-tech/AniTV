@@ -46,6 +46,14 @@
         </Grid>
         </StackPanel>
       </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
+      <Grid x:Name="DownloadsPage" Visibility="Collapsed"><TextBlock x:Name="DownloadsEmpty" Text="Скачанных серий пока нет" Foreground="{StaticResource Muted}" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        <ScrollViewer VerticalScrollBarVisibility="Auto"><ItemsControl x:Name="DownloadsList"><ItemsControl.ItemTemplate><DataTemplate>
+          <Border Background="#171A26" BorderBrush="#303649" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel><TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="16" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Episode}" Foreground="#D7D9E2" FontSize="13" Margin="0,5,0,0"/><StackPanel Orientation="Horizontal" Margin="0,7,0,0"><TextBlock Text="{Binding Quality}" Foreground="#BCA8F8" FontSize="11"/><TextBlock Text="  ·  " Foreground="#656D82"/><TextBlock Text="{Binding FileSizeLabel}" Foreground="#8F96A8" FontSize="11"/><TextBlock Text="  ·  " Foreground="#656D82"/><TextBlock Text="{Binding Status}" Foreground="#8F96A8" FontSize="11"/></StackPanel><ProgressBar Value="{Binding Progress}" Maximum="100" Height="6" Margin="0,12,20,0" Foreground="{StaticResource Accent}" Background="#303548"/></StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"><Button Content="▶  Открыть" Tag="{Binding}" Click="DownloadOpen_Click" Padding="12,8" Margin="0,0,8,0" IsEnabled="{Binding CanOpen}"/><Button Content="Папка" Tag="{Binding}" Click="DownloadFolder_Click" Padding="12,8" Margin="0,0,8,0"/><Button Content="Отмена" Tag="{Binding}" Click="DownloadCancel_Click" Padding="12,8" Margin="0,0,8,0" IsEnabled="{Binding CanCancel}"/><Button Content="Удалить" Tag="{Binding}" Click="DownloadDelete_Click" Padding="12,8" Foreground="#E9B3C4" Background="#392431" IsEnabled="{Binding CanOpen}"/></StackPanel>
+          </Grid></Border>
+        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
+      </Grid>
       <Grid x:Name="LoadingPanel" Background="{StaticResource Background}" Visibility="Collapsed"><StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><ContentControl Style="{StaticResource LoadingSpinner}" Width="48" Height="48" HorizontalAlignment="Center" VerticalAlignment="Center"/><TextBlock Text="Загружаем каталог…" Foreground="{StaticResource Muted}" Margin="0,10"/></StackPanel></Grid>
       <Grid x:Name="EmptyPanel" Visibility="Collapsed"><TextBlock Text="Ничего не найдено" FontSize="20" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid></Grid>
       <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,8,0,0" MinHeight="28">
@@ -88,22 +96,6 @@
             <ScrollViewer x:Name="DetailDescriptionScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <TextBlock x:Name="DetailDescription" TextWrapping="Wrap" Foreground="#CED1DB" LineHeight="21"/>
             </ScrollViewer>
-          </Grid>
-        </Grid>
-      </Border>
-    </Grid>
-    <Grid x:Name="DownloadsOverlay" Panel.ZIndex="40" Grid.ColumnSpan="2" Background="#D90B0D14" Visibility="Collapsed" MouseDown="DownloadsOverlay_MouseDown">
-      <Border Width="760" MaxHeight="620" Margin="24" Padding="26" Background="{StaticResource Surface}" BorderBrush="#34394C" BorderThickness="1" CornerRadius="18" HorizontalAlignment="Center" VerticalAlignment="Center">
-        <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-          <Grid><StackPanel><TextBlock Text="Загрузки" FontSize="27" FontWeight="Bold"/><TextBlock Text="Серии сохраняются в папку Видео\AniTV" Foreground="{StaticResource Muted}" Margin="0,5,0,18"/></StackPanel><Button Content="✕" Click="CloseDownloads_Click" HorizontalAlignment="Right" VerticalAlignment="Top" Background="Transparent" Padding="9"/></Grid>
-          <Grid Grid.Row="1"><TextBlock x:Name="DownloadsEmpty" Text="Загрузок пока нет" Foreground="{StaticResource Muted}" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-            <ScrollViewer VerticalScrollBarVisibility="Auto"><ItemsControl x:Name="DownloadsList"><ItemsControl.ItemTemplate><DataTemplate>
-              <Border Background="#1A1E2B" BorderBrush="#303649" BorderThickness="1" CornerRadius="12" Padding="15" Margin="0,0,0,10"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                <Grid><StackPanel><TextBlock Text="{Binding DisplayTitle}" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Quality}" Foreground="#BCA8F8" FontSize="11" Margin="0,4,0,0"/></StackPanel><TextBlock Text="{Binding Status}" Foreground="{StaticResource Muted}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center" MaxWidth="250" TextTrimming="CharacterEllipsis"/></Grid>
-                <ProgressBar Grid.Row="1" Value="{Binding Progress}" Maximum="100" Height="6" Margin="0,12,0,10" Foreground="{StaticResource Accent}" Background="#303548"/>
-                <Grid Grid.Row="2"><TextBlock Text="{Binding FileName}" Foreground="#777F94" FontSize="10" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="Открыть" Tag="{Binding}" Click="DownloadOpen_Click" Padding="10,5" Margin="0,0,7,0" IsEnabled="{Binding CanOpen}"/><Button Content="Папка" Tag="{Binding}" Click="DownloadFolder_Click" Padding="10,5" Margin="0,0,7,0"/><Button Content="Отмена" Tag="{Binding}" Click="DownloadCancel_Click" Padding="10,5" IsEnabled="{Binding CanCancel}"/></StackPanel></Grid>
-              </Grid></Border>
-            </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
           </Grid>
         </Grid>
       </Border>

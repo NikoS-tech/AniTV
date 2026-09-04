@@ -24,14 +24,16 @@ public sealed class EpisodeDownload : INotifyPropertyChanged
     public CancellationTokenSource Cancellation { get; } = new();
     public string DisplayTitle => $"{Title} · {Episode}";
     public string FileName => Path.GetFileName(OutputPath);
+    public string FileSizeLabel => File.Exists(OutputPath) ? FormatSize(new FileInfo(OutputPath).Length) : "—";
     public string Status { get => status; set { status=value; Changed(); } }
     public double Progress { get => progress; set { progress=Math.Clamp(value,0,100); Changed(); } }
     public bool IsRunning { get => isRunning; set { isRunning=value; Changed(); Changed(nameof(CanCancel)); } }
-    public bool IsComplete { get => isComplete; set { isComplete=value; Changed(); Changed(nameof(CanOpen)); } }
+    public bool IsComplete { get => isComplete; set { isComplete=value; Changed(); Changed(nameof(CanOpen)); Changed(nameof(FileSizeLabel)); } }
     public bool CanCancel => IsRunning || Status == "В очереди";
     public bool CanOpen => IsComplete && File.Exists(OutputPath);
     public event PropertyChangedEventHandler? PropertyChanged;
     void Changed([CallerMemberName] string? name=null) => PropertyChanged?.Invoke(this,new(name));
+    static string FormatSize(long bytes) => bytes >= 1L<<30 ? $"{bytes/(double)(1L<<30):0.##} ГБ" : $"{bytes/(double)(1L<<20):0} МБ";
 }
 
 public sealed class FfmpegDownloadService

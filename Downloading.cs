@@ -14,7 +14,6 @@ public partial class MainWindow
     readonly ObservableCollection<EpisodeDownload> downloads=[];
     readonly FfmpegDownloadService downloadService=new();
     readonly DispatcherTimer downloadNoticeTimer=new(){Interval=TimeSpan.FromSeconds(3)};
-    bool videoHiddenForDownloads;
     string DownloadRoot => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),"AniTV");
 
     void InitializeDownloads() { DownloadsList.ItemsSource=downloads; LoadDownloadedFiles(); downloadNoticeTimer.Tick+=(_,_)=>{downloadNoticeTimer.Stop();DownloadNotice.Visibility=Visibility.Collapsed;}; }
@@ -118,31 +117,21 @@ public partial class MainWindow
         downloadNoticeTimer.Stop(); downloadNoticeTimer.Start();
     }
 
-    void Downloads_Click(object sender, RoutedEventArgs e) => ShowDownloads();
-    void ShowDownloads()
+    void Downloads_Click(object sender, RoutedEventArgs e) => ShowDownloadsPage();
+    void ShowDownloadsPage()
     {
+        CancelCatalogLoading(); DetailsOverlay.Visibility=Visibility.Collapsed;
         LoadDownloadedFiles();
+        CatalogScroll.Visibility=Visibility.Collapsed; DownloadsPage.Visibility=Visibility.Visible;
+        LoadingPanel.Visibility=EmptyPanel.Visibility=GenrePanel.Visibility=Visibility.Collapsed;
         DownloadsEmpty.Visibility=downloads.Count==0?Visibility.Visible:Visibility.Collapsed;
-        if(playerOpen && PlayerVideoBorder.Child is not null)
-        {
-            videoHiddenForDownloads=true;
-            SuspendVideoSurface();
-            controlsTimer.Stop(); Mouse.OverrideCursor=null;
-        }
-        DownloadsOverlay.Visibility=Visibility.Visible;
+        PageTitle.Text="Загрузки"; Subtitle.Text="Скачанные серии и активные задания";
+        StatusText.Text=$"Файлов: {downloads.Count(item=>item.CanOpen)} · Активных загрузок: {downloads.Count(item=>item.CanCancel)}";
     }
-    void HideDownloads()
+    void ShowCatalogContent()
     {
-        DownloadsOverlay.Visibility=Visibility.Collapsed;
-        if(videoHiddenForDownloads && playerOpen)
-        {
-            ResumeVideoSurface();
-            if(isFullscreen) RevealFullscreenControls();
-        }
-        videoHiddenForDownloads=false;
+        DownloadsPage.Visibility=Visibility.Collapsed; CatalogScroll.Visibility=Visibility.Visible;
     }
-    void CloseDownloads_Click(object sender, RoutedEventArgs e) => HideDownloads();
-    void DownloadsOverlay_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e) { if(e.OriginalSource==DownloadsOverlay) HideDownloads(); }
     void DownloadCancel_Click(object sender, RoutedEventArgs e) { if(sender is Button {Tag:EpisodeDownload item}) item.Cancellation.Cancel(); }
     void DownloadOpen_Click(object sender, RoutedEventArgs e)
     {
@@ -154,6 +143,21 @@ public partial class MainWindow
         if(sender is not Button {Tag:EpisodeDownload item}) return;
         Directory.CreateDirectory(Path.GetDirectoryName(item.OutputPath)!);
         Process.Start(new ProcessStartInfo("explorer.exe",$"/select,\"{item.OutputPath}\""){UseShellExecute=true});
+    }
+    void DownloadDelete_Click(object sender,RoutedEventArgs e)
+    {
+        if(sender is not Button {Tag:EpisodeDownload item} || !item.CanOpen) return;
+        var confirmation=new ConfirmDownloadDeleteWindow(item.DisplayTitle){Owner=this};
+        if(confirmation.ShowDialog()!=true) return;
+        try
+        {
+            File.Delete(item.OutputPath); downloads.Remove(item);
+            var folder=Path.GetDirectoryName(item.OutputPath); if(folder is not null && Directory.Exists(folder) && !Directory.EnumerateFileSystemEntries(folder).Any()) Directory.Delete(folder);
+            if(selected is not null) {MarkDownloaded(selected,episodes); EpisodeBox.Items.Refresh(); FullscreenEpisodeBox.Items.Refresh();}
+            DownloadsEmpty.Visibility=downloads.Count==0?Visibility.Visible:Visibility.Collapsed;
+            StatusText.Text=$"Файлов: {downloads.Count(entry=>entry.CanOpen)} · Активных загрузок: {downloads.Count(entry=>entry.CanCancel)}";
+        }
+        catch(Exception ex) { MessageBox.Show("Не удалось удалить файл: "+ex.Message,"AniTV",MessageBoxButton.OK,MessageBoxImage.Warning); }
     }
     static string SafeName(string value) { var invalid=Regex.Escape(new string(Path.GetInvalidFileNameChars())); var result=Regex.Replace(value,$"[{invalid}]"," ").Trim().TrimEnd('.'); if(string.IsNullOrWhiteSpace(result)) return "Без названия"; return result.Length>90?result[..90].Trim():result; }
 }
