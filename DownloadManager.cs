@@ -17,8 +17,8 @@ public sealed class EpisodeDownload : INotifyPropertyChanged
     public required string Title { get; init; }
     public required string Episode { get; init; }
     public required string Quality { get; init; }
-    public required Uri Url { get; init; }
-    public required string Referrer { get; init; }
+    public Uri? Url { get; init; }
+    public string Referrer { get; init; } = "";
     public required string OutputPath { get; init; }
     public double DurationSeconds { get; set; }
     public CancellationTokenSource Cancellation { get; } = new();
@@ -58,6 +58,7 @@ public sealed class FfmpegDownloadService
             var partial=item.OutputPath+".part";
             if(File.Exists(partial)) File.Delete(partial);
             var start = new ProcessStartInfo(ExecutablePath) { UseShellExecute=false, RedirectStandardOutput=true, RedirectStandardError=true, CreateNoWindow=true };
+            if(item.Url is null) throw new InvalidOperationException("Для загрузки не задан адрес видео.");
             foreach(var argument in new[]{"-y","-hide_banner","-loglevel","info","-nostats","-progress","pipe:1","-headers",$"Referer: {item.Referrer}\r\n","-i",item.Url.AbsoluteUri,"-map","0","-c","copy","-movflags","+faststart","-f","mp4",partial}) start.ArgumentList.Add(argument);
             using var process = new Process { StartInfo=start,EnableRaisingEvents=true };
             process.Start(); item.Status="Скачивание…";

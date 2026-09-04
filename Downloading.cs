@@ -15,8 +15,9 @@ public partial class MainWindow
     readonly FfmpegDownloadService downloadService=new();
     readonly DispatcherTimer downloadNoticeTimer=new(){Interval=TimeSpan.FromSeconds(3)};
     bool videoHiddenForDownloads;
+    string DownloadRoot => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),"AniTV");
 
-    void InitializeDownloads() { DownloadsList.ItemsSource=downloads; downloadNoticeTimer.Tick+=(_,_)=>{downloadNoticeTimer.Stop();DownloadNotice.Visibility=Visibility.Collapsed;}; }
+    void InitializeDownloads() { DownloadsList.ItemsSource=downloads; LoadDownloadedFiles(); downloadNoticeTimer.Tick+=(_,_)=>{downloadNoticeTimer.Stop();DownloadNotice.Visibility=Visibility.Collapsed;}; }
     void CancelDownloads() { foreach(var item in downloads.Where(item=>item.CanCancel)) item.Cancellation.Cancel(); }
 
     async void DownloadCurrent_Click(object sender, RoutedEventArgs e)
@@ -38,29 +39,77 @@ public partial class MainWindow
     {
         if(selected is null || episodes.Count==0) return;
         if(!downloadService.IsAvailable) { ShowDownloadNotice("FFmpeg отсутствует в этой сборке"); return; }
-        var anime=selected; var added=0; var skipped=0;
         ShowDownloadNotice("Подготавливаем серии к загрузке…");
-        foreach(var episode in episodes)
-        {
-            try
-            {
-                var qualities=await best.GetQualitiesAsync(episode,CancellationToken.None);
-                var quality=PlaybackChoice.Maximum(qualities);
-                if(QueueDownload(anime,episode,quality,episode==activeEpisode?Math.Max(0,mediaPlayer.Length/1000d):0)) added++; else skipped++;
-            }
-            catch { skipped++; }
-        }
+        var added=await QueueAllAsync(selected,episodes);
         ShowDownloadNotice(added>0?$"В очередь добавлено серий: {added}. Параллельно загружаются до трёх.":"Новых серий для загрузки не найдено");
+    }
+
+    async void DownloadTitle_Click(object sender,RoutedEventArgs e)
+    {
+        if(sender is not Button button || selected is null) return;
+        if(!downloadService.IsAvailable) { button.Content="FFmpeg не найден"; return; }
+        var anime=selected; var original=button.Content; button.IsEnabled=false; button.Content="Подготавливаем…";
+        try
+        {
+            SourceMatching.EnsureSource(anime);
+            var preferred=ProgressFor(anime).LastSourceKey;
+            var source=anime.Sources.FirstOrDefault(item=>item.Key==preferred) ?? anime.Sources.First();
+            var list=await FetchEpisodes(anime,source,CancellationToken.None);
+            var added=await QueueAllAsync(anime,list);
+            button.Content=added>0?$"Добавлено: {added}":"Уже скачано";
+            await Task.Delay(1800);
+        }
+        catch { button.Content="Ошибка загрузки"; await Task.Delay(1800); }
+        finally { button.Content=original; button.IsEnabled=true; }
+    }
+
+    async Task<int> QueueAllAsync(Anime anime,IReadOnlyList<VostEpisode> list)
+    {
+        var added=0;
+        foreach(var episode in list)
+        {
+            try { var quality=PlaybackChoice.Maximum(await best.GetQualitiesAsync(episode,CancellationToken.None)); if(QueueDownload(anime,episode,quality,episode==activeEpisode?Math.Max(0,mediaPlayer.Length/1000d):0)) added++; }
+            catch { }
+        }
+        return added;
     }
 
     bool QueueDownload(Anime anime,VostEpisode episode,StreamQuality quality,double duration)
     {
-        var folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),"AniTV",SafeName(anime.Title));
+        var folder=Path.Combine(DownloadRoot,SafeName(anime.Title));
         var number=episode.Number>0?episode.Number.ToString("D2"):SafeName(episode.Name);
         var output=Path.Combine(folder,$"{number} серия - {SafeName(quality.Name)}.mp4");
         if(File.Exists(output) || downloads.Any(item=>string.Equals(item.OutputPath,output,StringComparison.OrdinalIgnoreCase) && (item.CanOpen || item.CanCancel))) return false;
         var item=new EpisodeDownload {Title=anime.Title,Episode=episode.Name,Quality=quality.Name,Url=quality.Url,Referrer=episode.Referrer,OutputPath=output,DurationSeconds=duration};
-        downloads.Insert(0,item); DownloadsEmpty.Visibility=Visibility.Collapsed; _=downloadService.DownloadAsync(item); return true;
+        downloads.Insert(0,item); DownloadsEmpty.Visibility=Visibility.Collapsed; _=RunDownloadAsync(item,episode); return true;
+    }
+
+    async Task RunDownloadAsync(EpisodeDownload item,VostEpisode episode)
+    {
+        await downloadService.DownloadAsync(item);
+        if(!item.IsComplete) return;
+        episode.IsDownloaded=true; EpisodeBox.Items.Refresh(); FullscreenEpisodeBox.Items.Refresh(); LoadDownloadedFiles();
+    }
+
+    void MarkDownloaded(Anime anime,IEnumerable<VostEpisode> list)
+    {
+        var folder=Path.Combine(DownloadRoot,SafeName(anime.Title));
+        foreach(var episode in list)
+        {
+            var prefix=episode.Number>0?$"{episode.Number:D2} серия -":SafeName(episode.Name);
+            episode.IsDownloaded=Directory.Exists(folder) && Directory.EnumerateFiles(folder,prefix+"*.mp4").Any();
+        }
+    }
+
+    void LoadDownloadedFiles()
+    {
+        if(!Directory.Exists(DownloadRoot)) return;
+        foreach(var file in Directory.EnumerateFiles(DownloadRoot,"*.mp4",SearchOption.AllDirectories).OrderByDescending(File.GetLastWriteTimeUtc))
+        {
+            if(downloads.Any(item=>string.Equals(item.OutputPath,file,StringComparison.OrdinalIgnoreCase))) continue;
+            var title=Directory.GetParent(file)?.Name ?? "Локальное видео";
+            downloads.Add(new EpisodeDownload {Title=title,Episode=Path.GetFileNameWithoutExtension(file),Quality="Локальный файл",OutputPath=file,Progress=100,IsComplete=true,Status="Скачано"});
+        }
     }
 
     void ShowDownloadNotice(string text)
@@ -72,6 +121,7 @@ public partial class MainWindow
     void Downloads_Click(object sender, RoutedEventArgs e) => ShowDownloads();
     void ShowDownloads()
     {
+        LoadDownloadedFiles();
         DownloadsEmpty.Visibility=downloads.Count==0?Visibility.Visible:Visibility.Collapsed;
         if(playerOpen && PlayerVideoBorder.Child is not null)
         {
@@ -106,5 +156,4 @@ public partial class MainWindow
         Process.Start(new ProcessStartInfo("explorer.exe",$"/select,\"{item.OutputPath}\""){UseShellExecute=true});
     }
     static string SafeName(string value) { var invalid=Regex.Escape(new string(Path.GetInvalidFileNameChars())); var result=Regex.Replace(value,$"[{invalid}]"," ").Trim().TrimEnd('.'); if(string.IsNullOrWhiteSpace(result)) return "Без названия"; return result.Length>90?result[..90].Trim():result; }
-    static string UniquePath(string folder,string file) { Directory.CreateDirectory(folder); var path=Path.Combine(folder,file); if(!File.Exists(path)) return path; var name=Path.GetFileNameWithoutExtension(file); var extension=Path.GetExtension(file); for(var i=2;;i++){path=Path.Combine(folder,$"{name} ({i}){extension}");if(!File.Exists(path))return path;} }
 }

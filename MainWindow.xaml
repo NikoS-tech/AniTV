@@ -78,10 +78,11 @@
             <TextBlock x:Name="DetailTitle" FontSize="29" FontWeight="Bold" TextWrapping="Wrap"/>
             <TextBlock x:Name="DetailNative" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,4,0,14"/>
             <Grid x:Name="DetailActions" Margin="0,2,0,18">
-              <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
               <Button x:Name="FavoriteButton" Click="Favorite_Click" Padding="12,10" Margin="0,0,8,0" VerticalAlignment="Center"/>
-              <Button x:Name="WatchButton" Grid.Column="1" Content="▶  Смотреть" Click="Watch_Click" Background="{StaticResource Accent}" Padding="12,10" VerticalAlignment="Center"/>
-              <TextBlock x:Name="DetailProgress" Grid.Column="2" Foreground="#C4B5FD" FontSize="11" Margin="12,0,0,0" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" TextAlignment="Left" VerticalAlignment="Center"/>
+              <Button x:Name="WatchButton" Grid.Column="1" Content="▶  Смотреть" Click="Watch_Click" Background="{StaticResource Accent}" Padding="12,10" Margin="0,0,8,0" VerticalAlignment="Center"/>
+              <Button Grid.Column="2" Content="⇊  Скачать все" Click="DownloadTitle_Click" Padding="12,10" VerticalAlignment="Center"/>
+              <TextBlock x:Name="DetailProgress" Grid.Column="3" Foreground="#C4B5FD" FontSize="11" Margin="12,0,0,0" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" TextAlignment="Left" VerticalAlignment="Center"/>
             </Grid>
             </StackPanel>
             <ScrollViewer x:Name="DetailDescriptionScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">

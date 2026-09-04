@@ -35,6 +35,7 @@ public partial class MainWindow
         if (source.Provider == "vost") SourceMatching.MigrateEpisodeKeys(ProgressFor(anime), list);
         source.Available = list.Count;
         ProgressFor(anime).ObserveSource(source, list.Select(e => e.Key));
+        MarkDownloaded(anime,list);
         return list;
     }
     void UpdateSourceSelectors()

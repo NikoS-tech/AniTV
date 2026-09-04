@@ -14,7 +14,8 @@ public sealed record VostEpisode(string Name, Uri StandardUrl, Uri HdUrl, Uri? P
     public bool IsHls { get; init; }
     public int Number => int.TryParse(Regex.Match(Name, @"^\s*(\d+)\s*(?:серия|эпизод)?\s*$", RegexOptions.IgnoreCase).Groups[1].Value, out var n) ? n : 0;
     public bool IsWatched { get; set; }
-    public string DisplayName => (IsWatched ? "✓  " : "") + Name;
+    public bool IsDownloaded { get; set; }
+    public string DisplayName => (IsDownloaded ? "↓  " : "") + (IsWatched ? "✓  " : "") + Name;
     public override string ToString() => Name;
 }
 
