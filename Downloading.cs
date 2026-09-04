@@ -29,7 +29,7 @@ public partial class MainWindow
         {
             var quality=PlaybackChoice.Maximum(await best.GetQualitiesAsync(episode,CancellationToken.None));
             var added=QueueDownload(anime,episode,quality,episode==activeEpisode?Math.Max(0,mediaPlayer.Length/1000d):0);
-            ShowDownloadNotice(added?$"Добавлено: {episode.Name} · {quality.Name}":"Серия уже загружена или находится в очереди");
+            ShowDownloadNotice(added?$"Добавлено: {episode.Name} · {quality.Name}":"Серия уже загружена или находится в очереди",true);
         }
         catch(Exception ex) { ShowDownloadNotice("Не удалось подготовить загрузку: "+ex.Message); }
     }
@@ -47,6 +47,7 @@ public partial class MainWindow
             var list=await FetchEpisodes(anime,source,CancellationToken.None);
             var added=await QueueAllAsync(anime,list);
             button.Content=added>0?$"Добавлено: {added}":"Уже скачано";
+            DetailDownloadsLink.Visibility=Visibility.Visible;
             await Task.Delay(1800);
         }
         catch { button.Content="Ошибка загрузки"; await Task.Delay(1800); }
@@ -103,10 +104,17 @@ public partial class MainWindow
         }
     }
 
-    void ShowDownloadNotice(string text)
+    void ShowDownloadNotice(string text,bool showLink=false)
     {
-        DownloadNoticeText.Text=text; DownloadNotice.Visibility=Visibility.Visible;
+        DownloadNoticeText.Text=text; DownloadNoticeLink.Visibility=showLink?Visibility.Visible:Visibility.Collapsed; DownloadNotice.Visibility=Visibility.Visible;
+        downloadNoticeTimer.Interval=showLink?TimeSpan.FromSeconds(6):TimeSpan.FromSeconds(3);
         downloadNoticeTimer.Stop(); downloadNoticeTimer.Start();
+    }
+
+    void OpenDownloadsPage_Click(object sender,RoutedEventArgs e)
+    {
+        if(playerOpen) StopPlayerSession();
+        DetailsOverlay.Visibility=Visibility.Collapsed; ShowDownloadsPage();
     }
 
     void Downloads_Click(object sender, RoutedEventArgs e) => ShowDownloadsPage();
