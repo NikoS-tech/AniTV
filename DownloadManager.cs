@@ -28,13 +28,14 @@ public sealed class EpisodeDownload : INotifyPropertyChanged
     public string DisplayTitle => $"{Title} · {Episode}";
     public string FileName => Path.GetFileName(OutputPath);
     public string FileSizeLabel => File.Exists(OutputPath) ? FormatSize(new FileInfo(OutputPath).Length) : "—";
-    public string Status { get => status; set { status=value; Changed(); Changed(nameof(CanDismiss)); } }
+    public string Status { get => status; set { status=value; Changed(); Changed(nameof(CanDismiss)); Changed(nameof(CanShowFolder)); } }
     public double Progress { get => progress; set { progress=Math.Clamp(value,0,100); Changed(); } }
-    public bool IsRunning { get => isRunning; set { isRunning=value; Changed(); Changed(nameof(CanCancel)); Changed(nameof(CanPauseOrResume)); Changed(nameof(CanDismiss)); } }
-    public bool IsComplete { get => isComplete; set { isComplete=value; Changed(); Changed(nameof(CanOpen)); Changed(nameof(FileSizeLabel)); } }
+    public bool IsRunning { get => isRunning; set { isRunning=value; Changed(); Changed(nameof(CanCancel)); Changed(nameof(CanPauseOrResume)); Changed(nameof(CanDismiss)); Changed(nameof(CanShowFolder)); } }
+    public bool IsComplete { get => isComplete; set { isComplete=value; Changed(); Changed(nameof(CanOpen)); Changed(nameof(CanShowFolder)); Changed(nameof(FileSizeLabel)); } }
     public bool IsPaused { get => isPaused; set { isPaused=value; Changed(); Changed(nameof(PauseLabel)); Changed(nameof(CanPauseOrResume)); } }
     public bool CanCancel => IsRunning || Status == "В очереди";
     public bool CanOpen => IsComplete && File.Exists(OutputPath);
+    public bool CanShowFolder => CanOpen || CanCancel;
     public bool CanPauseOrResume => IsRunning;
     public bool CanDismiss => !IsRunning && !IsComplete && Status != "В очереди";
     public string PauseLabel => IsPaused ? "Продолжить" : "Пауза";
