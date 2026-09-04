@@ -34,6 +34,15 @@ jobs:
         shell: pwsh
         run: |
           $output = Join-Path $PWD "artifacts/${{ matrix.rid }}"
+          $ffmpegArchive = Join-Path $env:RUNNER_TEMP "ffmpeg.zip"
+          $ffmpegExtract = Join-Path $env:RUNNER_TEMP "ffmpeg"
+          Invoke-WebRequest -Uri "https://github.com/GyanD/codexffmpeg/releases/download/9.0.1/ffmpeg-9.0.1-essentials_build.zip" -OutFile $ffmpegArchive
+          if ((Get-FileHash -LiteralPath $ffmpegArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne "fec81ae03971d9dd4be3ebe02e263bd2ec1d789483f931bdbA5f5715e65da2e9".ToLowerInvariant()) {
+            throw "FFmpeg archive checksum mismatch"
+          }
+          Expand-Archive -LiteralPath $ffmpegArchive -DestinationPath $ffmpegExtract
+          New-Item -ItemType Directory -Force -Path (Join-Path $PWD "ffmpeg") | Out-Null
+          Copy-Item -LiteralPath (Join-Path $ffmpegExtract "ffmpeg-9.0.1-essentials_build/bin/ffmpeg.exe") -Destination (Join-Path $PWD "ffmpeg/ffmpeg.exe") -Force
           dotnet publish AniTV.csproj -c Release -r "${{ matrix.rid }}" --self-contained true -o $output
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

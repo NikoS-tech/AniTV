@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     {
         var vlcPath = Path.Combine(AppContext.BaseDirectory, "libvlc", Environment.Is64BitProcess ? "win-x64" : "win-x86");
         Core.Initialize(vlcPath); InitializeComponent();
+        InitializeDownloads();
         EpisodeBox.IsSynchronizedWithCurrentItem = false;
         FullscreenEpisodeBox.IsSynchronizedWithCurrentItem = false;
         SourceInitialized += (_, _) => InstallWindowSizingHook();
@@ -56,7 +57,7 @@ public partial class MainWindow : Window
         var orderedGenres=CatalogGenres.All.OrderBy(g=>g.Name,StringComparer.CurrentCultureIgnoreCase).ToList();
         for (var i=0;i<orderedGenres.Count;i++) genreFilters.Add(new GenreFilterItem { Genre=orderedGenres[i], ColorIndex=i });
         playbackTimer.Tick += PlaybackTimer_Tick;
-        Closing += (_, _) => { CancelCatalogLoading(); StopPlayerSession(); windowClosing = true; };
+        Closing += (_, _) => { CancelCatalogLoading(); CancelDownloads(); StopPlayerSession(); windowClosing = true; };
         Closed += (_, _) => { mediaPlayer.Stop(); VideoPlayer.MediaPlayer = null; currentMedia?.Dispose(); mediaPlayer.Dispose(); libVlc.Dispose(); };
         Loaded += async (_, _) => { mediaPlayer.Volume = (int)VolumeSlider.Value; LoadState(); await LoadAnime(); await RefreshTrackedAsync(); };
     }

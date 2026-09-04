@@ -6,6 +6,7 @@ dist/
 .appdata/
 .dotnet-home/
 .tmp-doc-review/
+ffmpeg/ffmpeg.exe
 .vs/
 Tests/**/bin/
 Tests/**/obj/
@@ -13,4 +14,3 @@ Tests/**/obj/
 *.suo
 *.log
 *.tmp
-

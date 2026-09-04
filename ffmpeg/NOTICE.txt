@@ -1,0 +1,9 @@
+AniTV includes the separate FFmpeg 9.0.1 command-line program from the
+"essentials" Windows build distributed by Gyan Doshi.
+
+FFmpeg project: https://ffmpeg.org/
+Windows build: https://www.gyan.dev/ffmpeg/builds/
+Corresponding source: https://github.com/FFmpeg/FFmpeg/tree/n9.0.1
+
+FFmpeg is invoked as an independent process and is not linked into AniTV.
+Its license is included in LICENSE.txt. AniTV does not modify FFmpeg.
