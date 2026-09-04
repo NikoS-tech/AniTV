@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace AniTV;
 
@@ -12,24 +13,60 @@ public partial class MainWindow
 {
     readonly ObservableCollection<EpisodeDownload> downloads=[];
     readonly FfmpegDownloadService downloadService=new();
+    readonly DispatcherTimer downloadNoticeTimer=new(){Interval=TimeSpan.FromSeconds(3)};
     bool videoHiddenForDownloads;
 
-    void InitializeDownloads() => DownloadsList.ItemsSource=downloads;
+    void InitializeDownloads() { DownloadsList.ItemsSource=downloads; downloadNoticeTimer.Tick+=(_,_)=>{downloadNoticeTimer.Stop();DownloadNotice.Visibility=Visibility.Collapsed;}; }
     void CancelDownloads() { foreach(var item in downloads.Where(item=>item.CanCancel)) item.Cancellation.Cancel(); }
 
     async void DownloadCurrent_Click(object sender, RoutedEventArgs e)
     {
         if(selected is null || selectedEpisode is null) return;
-        var qualities=(QualityBox.ItemsSource as IEnumerable<StreamQuality>)?.ToList() ?? [];
-        if(qualities.Count==0) { MessageBox.Show("Качества видео ещё не загружены.","AniTV"); return; }
-        if(!downloadService.IsAvailable) { MessageBox.Show("Компонент FFmpeg отсутствует в этой сборке.","AniTV",MessageBoxButton.OK,MessageBoxImage.Warning); return; }
-        var quality=PlaybackChoice.Maximum(qualities);
-        var folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),"AniTV",SafeName(selected.Title));
-        var number=selectedEpisode.Number>0 ? selectedEpisode.Number.ToString("D2") : SafeName(selectedEpisode.Name);
-        var output=UniquePath(folder,$"{number} серия - {SafeName(quality.Name)}.mp4");
-        var item=new EpisodeDownload { Title=selected.Title,Episode=selectedEpisode.Name,Quality=quality.Name,Url=quality.Url,Referrer=selectedEpisode.Referrer,OutputPath=output,DurationSeconds=Math.Max(0,mediaPlayer.Length/1000d) };
-        downloads.Insert(0,item); ShowDownloads();
-        await downloadService.DownloadAsync(item);
+        if(!downloadService.IsAvailable) { ShowDownloadNotice("FFmpeg отсутствует в этой сборке"); return; }
+        var anime=selected; var episode=selectedEpisode;
+        ShowDownloadNotice($"Подготавливаем: {episode.Name}…");
+        try
+        {
+            var quality=PlaybackChoice.Maximum(await best.GetQualitiesAsync(episode,CancellationToken.None));
+            var added=QueueDownload(anime,episode,quality,episode==activeEpisode?Math.Max(0,mediaPlayer.Length/1000d):0);
+            ShowDownloadNotice(added?$"Добавлено: {episode.Name} · {quality.Name}":"Серия уже загружена или находится в очереди");
+        }
+        catch(Exception ex) { ShowDownloadNotice("Не удалось подготовить загрузку: "+ex.Message); }
+    }
+
+    async void DownloadAll_Click(object sender,RoutedEventArgs e)
+    {
+        if(selected is null || episodes.Count==0) return;
+        if(!downloadService.IsAvailable) { ShowDownloadNotice("FFmpeg отсутствует в этой сборке"); return; }
+        var anime=selected; var added=0; var skipped=0;
+        ShowDownloadNotice("Подготавливаем серии к загрузке…");
+        foreach(var episode in episodes)
+        {
+            try
+            {
+                var qualities=await best.GetQualitiesAsync(episode,CancellationToken.None);
+                var quality=PlaybackChoice.Maximum(qualities);
+                if(QueueDownload(anime,episode,quality,episode==activeEpisode?Math.Max(0,mediaPlayer.Length/1000d):0)) added++; else skipped++;
+            }
+            catch { skipped++; }
+        }
+        ShowDownloadNotice(added>0?$"В очередь добавлено серий: {added}. Параллельно загружаются до трёх.":"Новых серий для загрузки не найдено");
+    }
+
+    bool QueueDownload(Anime anime,VostEpisode episode,StreamQuality quality,double duration)
+    {
+        var folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),"AniTV",SafeName(anime.Title));
+        var number=episode.Number>0?episode.Number.ToString("D2"):SafeName(episode.Name);
+        var output=Path.Combine(folder,$"{number} серия - {SafeName(quality.Name)}.mp4");
+        if(File.Exists(output) || downloads.Any(item=>string.Equals(item.OutputPath,output,StringComparison.OrdinalIgnoreCase) && (item.CanOpen || item.CanCancel))) return false;
+        var item=new EpisodeDownload {Title=anime.Title,Episode=episode.Name,Quality=quality.Name,Url=quality.Url,Referrer=episode.Referrer,OutputPath=output,DurationSeconds=duration};
+        downloads.Insert(0,item); DownloadsEmpty.Visibility=Visibility.Collapsed; _=downloadService.DownloadAsync(item); return true;
+    }
+
+    void ShowDownloadNotice(string text)
+    {
+        DownloadNoticeText.Text=text; DownloadNotice.Visibility=Visibility.Visible;
+        downloadNoticeTimer.Stop(); downloadNoticeTimer.Start();
     }
 
     void Downloads_Click(object sender, RoutedEventArgs e) => ShowDownloads();

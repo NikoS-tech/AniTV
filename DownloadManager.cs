@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace AniTV;
 
@@ -18,7 +20,7 @@ public sealed class EpisodeDownload : INotifyPropertyChanged
     public required Uri Url { get; init; }
     public required string Referrer { get; init; }
     public required string OutputPath { get; init; }
-    public double DurationSeconds { get; init; }
+    public double DurationSeconds { get; set; }
     public CancellationTokenSource Cancellation { get; } = new();
     public string DisplayTitle => $"{Title} · {Episode}";
     public string FileName => Path.GetFileName(OutputPath);
@@ -34,7 +36,7 @@ public sealed class EpisodeDownload : INotifyPropertyChanged
 
 public sealed class FfmpegDownloadService
 {
-    readonly SemaphoreSlim queue = new(1,1);
+    readonly SemaphoreSlim queue = new(3,3);
     public string ExecutablePath { get; }
     public bool IsAvailable => File.Exists(ExecutablePath);
 
@@ -56,11 +58,11 @@ public sealed class FfmpegDownloadService
             var partial=item.OutputPath+".part";
             if(File.Exists(partial)) File.Delete(partial);
             var start = new ProcessStartInfo(ExecutablePath) { UseShellExecute=false, RedirectStandardOutput=true, RedirectStandardError=true, CreateNoWindow=true };
-            foreach(var argument in new[]{"-y","-hide_banner","-loglevel","warning","-progress","pipe:1","-headers",$"Referer: {item.Referrer}\r\n","-i",item.Url.AbsoluteUri,"-map","0","-c","copy","-movflags","+faststart","-f","mp4",partial}) start.ArgumentList.Add(argument);
+            foreach(var argument in new[]{"-y","-hide_banner","-loglevel","info","-nostats","-progress","pipe:1","-headers",$"Referer: {item.Referrer}\r\n","-i",item.Url.AbsoluteUri,"-map","0","-c","copy","-movflags","+faststart","-f","mp4",partial}) start.ArgumentList.Add(argument);
             using var process = new Process { StartInfo=start,EnableRaisingEvents=true };
             process.Start(); item.Status="Скачивание…";
             using var registration=item.Cancellation.Token.Register(() => { try { if(!process.HasExited) process.Kill(true); } catch { } });
-            var errorTask=process.StandardError.ReadToEndAsync(item.Cancellation.Token);
+            var errorTask=ReadDiagnosticsAsync(process,item,item.Cancellation.Token);
             while(await process.StandardOutput.ReadLineAsync(item.Cancellation.Token) is { } line)
             {
                 if(line.StartsWith("out_time_us=",StringComparison.Ordinal) && long.TryParse(line[12..],NumberStyles.Integer,CultureInfo.InvariantCulture,out var microseconds) && item.DurationSeconds>0)
@@ -77,6 +79,18 @@ public sealed class FfmpegDownloadService
     }
 
     static void DeletePartial(string output) { try { var path=output+".part"; if(File.Exists(path)) File.Delete(path); } catch { } }
+    static async Task<string> ReadDiagnosticsAsync(Process process,EpisodeDownload item,CancellationToken token)
+    {
+        var lines=new Queue<string>();
+        while(await process.StandardError.ReadLineAsync(token) is { } line)
+        {
+            var match=Regex.Match(line,@"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)");
+            if(match.Success && double.TryParse(match.Groups[3].Value,NumberStyles.Float,CultureInfo.InvariantCulture,out var seconds))
+                item.DurationSeconds=int.Parse(match.Groups[1].Value)*3600+int.Parse(match.Groups[2].Value)*60+seconds;
+            lines.Enqueue(line); if(lines.Count>12) lines.Dequeue();
+        }
+        return string.Join(Environment.NewLine,lines);
+    }
     static string ShortError(string value) { var line=value.Split('\n',StringSplitOptions.RemoveEmptyEntries).LastOrDefault()?.Trim() ?? value; return line.Length>150 ? line[..150]+"…" : line; }
     static string? FindOnPath(string name) => (Environment.GetEnvironmentVariable("PATH")??"").Split(Path.PathSeparator).Select(path=>Path.Combine(path,name)).FirstOrDefault(File.Exists);
 }
