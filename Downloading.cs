@@ -34,15 +34,6 @@ public partial class MainWindow
         catch(Exception ex) { ShowDownloadNotice("Не удалось подготовить загрузку: "+ex.Message); }
     }
 
-    async void DownloadAll_Click(object sender,RoutedEventArgs e)
-    {
-        if(selected is null || episodes.Count==0) return;
-        if(!downloadService.IsAvailable) { ShowDownloadNotice("FFmpeg отсутствует в этой сборке"); return; }
-        ShowDownloadNotice("Подготавливаем серии к загрузке…");
-        var added=await QueueAllAsync(selected,episodes);
-        ShowDownloadNotice(added>0?$"В очередь добавлено серий: {added}. Параллельно загружаются до трёх.":"Новых серий для загрузки не найдено");
-    }
-
     async void DownloadTitle_Click(object sender,RoutedEventArgs e)
     {
         if(sender is not Button button || selected is null) return;
@@ -86,8 +77,9 @@ public partial class MainWindow
     async Task RunDownloadAsync(EpisodeDownload item,VostEpisode episode)
     {
         await downloadService.DownloadAsync(item);
+        UpdateDownloadsSummary();
         if(!item.IsComplete) return;
-        episode.IsDownloaded=true; EpisodeBox.Items.Refresh(); FullscreenEpisodeBox.Items.Refresh(); LoadDownloadedFiles();
+        episode.IsDownloaded=true; EpisodeBox.Items.Refresh(); FullscreenEpisodeBox.Items.Refresh(); if(selectedEpisode==episode) SyncEpisodeSelectors(episode); LoadDownloadedFiles();
     }
 
     void MarkDownloaded(Anime anime,IEnumerable<VostEpisode> list)
@@ -126,13 +118,19 @@ public partial class MainWindow
         LoadingPanel.Visibility=EmptyPanel.Visibility=GenrePanel.Visibility=Visibility.Collapsed;
         DownloadsEmpty.Visibility=downloads.Count==0?Visibility.Visible:Visibility.Collapsed;
         PageTitle.Text="Загрузки"; Subtitle.Text="Скачанные серии и активные задания";
-        StatusText.Text=$"Файлов: {downloads.Count(item=>item.CanOpen)} · Активных загрузок: {downloads.Count(item=>item.CanCancel)}";
+        UpdateDownloadsSummary();
     }
     void ShowCatalogContent()
     {
         DownloadsPage.Visibility=Visibility.Collapsed; CatalogScroll.Visibility=Visibility.Visible;
     }
     void DownloadCancel_Click(object sender, RoutedEventArgs e) { if(sender is Button {Tag:EpisodeDownload item}) item.Cancellation.Cancel(); }
+    void DownloadPause_Click(object sender,RoutedEventArgs e) { if(sender is Button {Tag:EpisodeDownload item}) downloadService.TogglePause(item); }
+    void DownloadDismiss_Click(object sender,RoutedEventArgs e)
+    {
+        if(sender is not Button {Tag:EpisodeDownload item} || !item.CanDismiss) return;
+        downloads.Remove(item); DownloadsEmpty.Visibility=downloads.Count==0?Visibility.Visible:Visibility.Collapsed; UpdateDownloadsSummary();
+    }
     void DownloadOpen_Click(object sender, RoutedEventArgs e)
     {
         if(sender is not Button {Tag:EpisodeDownload item} || !item.CanOpen) return;
@@ -141,8 +139,9 @@ public partial class MainWindow
     void DownloadFolder_Click(object sender, RoutedEventArgs e)
     {
         if(sender is not Button {Tag:EpisodeDownload item}) return;
-        Directory.CreateDirectory(Path.GetDirectoryName(item.OutputPath)!);
-        Process.Start(new ProcessStartInfo("explorer.exe",$"/select,\"{item.OutputPath}\""){UseShellExecute=true});
+        var folder=Path.GetDirectoryName(item.OutputPath)!; Directory.CreateDirectory(folder);
+        var arguments=File.Exists(item.OutputPath)?$"/select,\"{item.OutputPath}\"":$"\"{folder}\"";
+        Process.Start(new ProcessStartInfo("explorer.exe",arguments){UseShellExecute=true});
     }
     void DownloadDelete_Click(object sender,RoutedEventArgs e)
     {
@@ -153,11 +152,12 @@ public partial class MainWindow
         {
             File.Delete(item.OutputPath); downloads.Remove(item);
             var folder=Path.GetDirectoryName(item.OutputPath); if(folder is not null && Directory.Exists(folder) && !Directory.EnumerateFileSystemEntries(folder).Any()) Directory.Delete(folder);
-            if(selected is not null) {MarkDownloaded(selected,episodes); EpisodeBox.Items.Refresh(); FullscreenEpisodeBox.Items.Refresh();}
+            if(selected is not null) {MarkDownloaded(selected,episodes); EpisodeBox.Items.Refresh(); FullscreenEpisodeBox.Items.Refresh(); if(selectedEpisode is not null) SyncEpisodeSelectors(selectedEpisode);}
             DownloadsEmpty.Visibility=downloads.Count==0?Visibility.Visible:Visibility.Collapsed;
-            StatusText.Text=$"Файлов: {downloads.Count(entry=>entry.CanOpen)} · Активных загрузок: {downloads.Count(entry=>entry.CanCancel)}";
+            UpdateDownloadsSummary();
         }
         catch(Exception ex) { MessageBox.Show("Не удалось удалить файл: "+ex.Message,"AniTV",MessageBoxButton.OK,MessageBoxImage.Warning); }
     }
     static string SafeName(string value) { var invalid=Regex.Escape(new string(Path.GetInvalidFileNameChars())); var result=Regex.Replace(value,$"[{invalid}]"," ").Trim().TrimEnd('.'); if(string.IsNullOrWhiteSpace(result)) return "Без названия"; return result.Length>90?result[..90].Trim():result; }
+    void UpdateDownloadsSummary() { if(DownloadsPage.Visibility==Visibility.Visible) StatusText.Text=$"Файлов: {downloads.Count(item=>item.CanOpen)} · Активных загрузок: {downloads.Count(item=>item.CanCancel)}"; }
 }

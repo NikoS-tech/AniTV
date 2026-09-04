@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -14,6 +15,7 @@ public sealed class EpisodeDownload : INotifyPropertyChanged
     double progress;
     bool isRunning;
     bool isComplete;
+    bool isPaused;
     public required string Title { get; init; }
     public required string Episode { get; init; }
     public required string Quality { get; init; }
@@ -22,15 +24,20 @@ public sealed class EpisodeDownload : INotifyPropertyChanged
     public required string OutputPath { get; init; }
     public double DurationSeconds { get; set; }
     public CancellationTokenSource Cancellation { get; } = new();
+    internal Process? RunningProcess { get; set; }
     public string DisplayTitle => $"{Title} · {Episode}";
     public string FileName => Path.GetFileName(OutputPath);
     public string FileSizeLabel => File.Exists(OutputPath) ? FormatSize(new FileInfo(OutputPath).Length) : "—";
-    public string Status { get => status; set { status=value; Changed(); } }
+    public string Status { get => status; set { status=value; Changed(); Changed(nameof(CanDismiss)); } }
     public double Progress { get => progress; set { progress=Math.Clamp(value,0,100); Changed(); } }
-    public bool IsRunning { get => isRunning; set { isRunning=value; Changed(); Changed(nameof(CanCancel)); } }
+    public bool IsRunning { get => isRunning; set { isRunning=value; Changed(); Changed(nameof(CanCancel)); Changed(nameof(CanPauseOrResume)); Changed(nameof(CanDismiss)); } }
     public bool IsComplete { get => isComplete; set { isComplete=value; Changed(); Changed(nameof(CanOpen)); Changed(nameof(FileSizeLabel)); } }
+    public bool IsPaused { get => isPaused; set { isPaused=value; Changed(); Changed(nameof(PauseLabel)); Changed(nameof(CanPauseOrResume)); } }
     public bool CanCancel => IsRunning || Status == "В очереди";
     public bool CanOpen => IsComplete && File.Exists(OutputPath);
+    public bool CanPauseOrResume => IsRunning;
+    public bool CanDismiss => !IsRunning && !IsComplete && Status != "В очереди";
+    public string PauseLabel => IsPaused ? "Продолжить" : "Пауза";
     public event PropertyChangedEventHandler? PropertyChanged;
     void Changed([CallerMemberName] string? name=null) => PropertyChanged?.Invoke(this,new(name));
     static string FormatSize(long bytes) => bytes >= 1L<<30 ? $"{bytes/(double)(1L<<30):0.##} ГБ" : $"{bytes/(double)(1L<<20):0} МБ";
@@ -63,7 +70,7 @@ public sealed class FfmpegDownloadService
             if(item.Url is null) throw new InvalidOperationException("Для загрузки не задан адрес видео.");
             foreach(var argument in new[]{"-y","-hide_banner","-loglevel","info","-nostats","-progress","pipe:1","-headers",$"Referer: {item.Referrer}\r\n","-i",item.Url.AbsoluteUri,"-map","0","-c","copy","-movflags","+faststart","-f","mp4",partial}) start.ArgumentList.Add(argument);
             using var process = new Process { StartInfo=start,EnableRaisingEvents=true };
-            process.Start(); item.Status="Скачивание…";
+            process.Start(); item.RunningProcess=process; item.Status="Скачивание…";
             using var registration=item.Cancellation.Token.Register(() => { try { if(!process.HasExited) process.Kill(true); } catch { } });
             var errorTask=ReadDiagnosticsAsync(process,item,item.Cancellation.Token);
             while(await process.StandardOutput.ReadLineAsync(item.Cancellation.Token) is { } line)
@@ -78,7 +85,7 @@ public sealed class FfmpegDownloadService
         }
         catch(OperationCanceledException) { item.Status="Отменено"; DeletePartial(item.OutputPath); }
         catch(Exception ex) { item.Status="Ошибка: "+ShortError(ex.Message); DeletePartial(item.OutputPath); }
-        finally { item.IsRunning=false; if(acquired) queue.Release(); }
+        finally { item.RunningProcess=null; item.IsPaused=false; item.IsRunning=false; if(acquired) queue.Release(); }
     }
 
     static void DeletePartial(string output) { try { var path=output+".part"; if(File.Exists(path)) File.Delete(path); } catch { } }
@@ -96,4 +103,15 @@ public sealed class FfmpegDownloadService
     }
     static string ShortError(string value) { var line=value.Split('\n',StringSplitOptions.RemoveEmptyEntries).LastOrDefault()?.Trim() ?? value; return line.Length>150 ? line[..150]+"…" : line; }
     static string? FindOnPath(string name) => (Environment.GetEnvironmentVariable("PATH")??"").Split(Path.PathSeparator).Select(path=>Path.Combine(path,name)).FirstOrDefault(File.Exists);
+
+    public bool TogglePause(EpisodeDownload item)
+    {
+        var process=item.RunningProcess; if(process is null || process.HasExited) return false;
+        var result=item.IsPaused?NtResumeProcess(process.Handle):NtSuspendProcess(process.Handle);
+        if(result!=0) return false;
+        item.IsPaused=!item.IsPaused; item.Status=item.IsPaused?"Приостановлено":"Скачивание…"; return true;
+    }
+
+    [DllImport("ntdll.dll")] static extern int NtSuspendProcess(IntPtr processHandle);
+    [DllImport("ntdll.dll")] static extern int NtResumeProcess(IntPtr processHandle);
 }

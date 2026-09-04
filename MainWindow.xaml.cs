@@ -178,6 +178,8 @@ public partial class MainWindow : Window
         EpisodeBox.SelectedItem = item;
         FullscreenEpisodeBox.SelectedItem = item;
         syncingSelectors = false;
+        var downloaded=item.IsDownloaded?Visibility.Visible:Visibility.Collapsed;
+        EpisodeDownloadedBadge.Visibility=FullscreenEpisodeDownloadedBadge.Visibility=downloaded;
     }
     async Task MoveEpisodeAsync(int direction)
     {
