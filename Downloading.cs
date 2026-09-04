@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace AniTV;
 
@@ -11,6 +12,7 @@ public partial class MainWindow
 {
     readonly ObservableCollection<EpisodeDownload> downloads=[];
     readonly FfmpegDownloadService downloadService=new();
+    bool videoHiddenForDownloads;
 
     void InitializeDownloads() => DownloadsList.ItemsSource=downloads;
     void CancelDownloads() { foreach(var item in downloads.Where(item=>item.CanCancel)) item.Cancellation.Cancel(); }
@@ -31,9 +33,31 @@ public partial class MainWindow
     }
 
     void Downloads_Click(object sender, RoutedEventArgs e) => ShowDownloads();
-    void ShowDownloads() { DownloadsEmpty.Visibility=downloads.Count==0?Visibility.Visible:Visibility.Collapsed; DownloadsOverlay.Visibility=Visibility.Visible; }
-    void CloseDownloads_Click(object sender, RoutedEventArgs e) => DownloadsOverlay.Visibility=Visibility.Collapsed;
-    void DownloadsOverlay_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e) { if(e.OriginalSource==DownloadsOverlay) DownloadsOverlay.Visibility=Visibility.Collapsed; }
+    void ShowDownloads()
+    {
+        DownloadsEmpty.Visibility=downloads.Count==0?Visibility.Visible:Visibility.Collapsed;
+        if(playerOpen && VideoPlayer.Visibility==Visibility.Visible)
+        {
+            videoHiddenForDownloads=true;
+            VideoPlayer.IsHitTestVisible=false;
+            VideoPlayer.Visibility=Visibility.Collapsed;
+            controlsTimer.Stop(); Mouse.OverrideCursor=null;
+        }
+        DownloadsOverlay.Visibility=Visibility.Visible;
+    }
+    void HideDownloads()
+    {
+        DownloadsOverlay.Visibility=Visibility.Collapsed;
+        if(videoHiddenForDownloads && playerOpen)
+        {
+            VideoPlayer.Visibility=Visibility.Visible;
+            VideoPlayer.IsHitTestVisible=true;
+            if(isFullscreen) RevealFullscreenControls();
+        }
+        videoHiddenForDownloads=false;
+    }
+    void CloseDownloads_Click(object sender, RoutedEventArgs e) => HideDownloads();
+    void DownloadsOverlay_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e) { if(e.OriginalSource==DownloadsOverlay) HideDownloads(); }
     void DownloadCancel_Click(object sender, RoutedEventArgs e) { if(sender is Button {Tag:EpisodeDownload item}) item.Cancellation.Cancel(); }
     void DownloadOpen_Click(object sender, RoutedEventArgs e)
     {
