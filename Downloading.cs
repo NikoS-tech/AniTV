@@ -36,11 +36,10 @@ public partial class MainWindow
     void ShowDownloads()
     {
         DownloadsEmpty.Visibility=downloads.Count==0?Visibility.Visible:Visibility.Collapsed;
-        if(playerOpen && VideoPlayer.Visibility==Visibility.Visible)
+        if(playerOpen && PlayerVideoBorder.Child is not null)
         {
             videoHiddenForDownloads=true;
-            VideoPlayer.IsHitTestVisible=false;
-            VideoPlayer.Visibility=Visibility.Collapsed;
+            SuspendVideoSurface();
             controlsTimer.Stop(); Mouse.OverrideCursor=null;
         }
         DownloadsOverlay.Visibility=Visibility.Visible;
@@ -50,8 +49,7 @@ public partial class MainWindow
         DownloadsOverlay.Visibility=Visibility.Collapsed;
         if(videoHiddenForDownloads && playerOpen)
         {
-            VideoPlayer.Visibility=Visibility.Visible;
-            VideoPlayer.IsHitTestVisible=true;
+            ResumeVideoSurface();
             if(isFullscreen) RevealFullscreenControls();
         }
         videoHiddenForDownloads=false;

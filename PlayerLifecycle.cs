@@ -37,6 +37,28 @@ public partial class MainWindow
         VideoPlayer.MediaPlayer = mediaPlayer;
     }
 
+    void SuspendVideoSurface()
+    {
+        if (!playerOpen || PlayerVideoBorder.Child is null) return;
+        videoOverlayContent.IsHitTestVisible = false;
+        VideoPlayer.IsHitTestVisible = false;
+        VideoPlayer.Content = null;
+        VideoPlayer.MediaPlayer = null;
+        VideoPlayer.Visibility = Visibility.Collapsed;
+        PlayerVideoBorder.Child = null;
+    }
+
+    void ResumeVideoSurface()
+    {
+        if (!playerOpen || windowClosing) return;
+        if (PlayerVideoBorder.Child is null) PlayerVideoBorder.Child = VideoPlayer;
+        VideoPlayer.Content = videoOverlayContent;
+        videoOverlayContent.IsHitTestVisible = true;
+        VideoPlayer.Visibility = Visibility.Visible;
+        VideoPlayer.IsHitTestVisible = true;
+        VideoPlayer.MediaPlayer = mediaPlayer;
+    }
+
     void StopPlayerSession()
     {
         mediaRequest?.Cancel();
