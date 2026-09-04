@@ -103,7 +103,7 @@ public partial class MainWindow
 
     async Task LoadNearCatalogEndAsync()
     {
-        if (catalogLoading || catalogFailed || libraryMode || (catalogPager?.HasMore != true && catalogPrefetch is null) ||
+        if (catalogLoading || catalogFailed || libraryMode || downloadsMode || (catalogPager?.HasMore != true && catalogPrefetch is null) ||
             PlayerOverlay.Visibility == Visibility.Visible || DetailsOverlay.Visibility == Visibility.Visible) return;
         if (CatalogScroll.ScrollableHeight - CatalogScroll.VerticalOffset <= 400)
             await LoadCatalogBatchAsync(false);

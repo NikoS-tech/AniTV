@@ -14,6 +14,7 @@ public partial class MainWindow
     readonly ObservableCollection<EpisodeDownload> downloads=[];
     readonly FfmpegDownloadService downloadService=new();
     readonly DispatcherTimer downloadNoticeTimer=new(){Interval=TimeSpan.FromSeconds(3)};
+    bool downloadsMode;
     string DownloadRoot => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),"AniTV");
 
     void InitializeDownloads() { DownloadsList.ItemsSource=downloads; LoadDownloadedFiles(); downloadNoticeTimer.Tick+=(_,_)=>{downloadNoticeTimer.Stop();DownloadNotice.Visibility=Visibility.Collapsed;}; }
@@ -120,6 +121,9 @@ public partial class MainWindow
     void Downloads_Click(object sender, RoutedEventArgs e) => ShowDownloadsPage();
     void ShowDownloadsPage()
     {
+        downloadsMode=true;
+        libraryMode=false;
+        completedMode=false;
         CancelCatalogLoading(); DetailsOverlay.Visibility=Visibility.Collapsed;
         LoadDownloadedFiles();
         CatalogScroll.Visibility=Visibility.Collapsed; DownloadsPage.Visibility=Visibility.Visible;
@@ -130,6 +134,7 @@ public partial class MainWindow
     }
     void ShowCatalogContent()
     {
+        downloadsMode=false;
         DownloadsPage.Visibility=Visibility.Collapsed; CatalogScroll.Visibility=Visibility.Visible;
     }
     void DownloadCancel_Click(object sender, RoutedEventArgs e) { if(sender is Button {Tag:EpisodeDownload item}) item.Cancellation.Cancel(); }
