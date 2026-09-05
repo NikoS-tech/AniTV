@@ -131,7 +131,7 @@ public partial class MainWindow : Window
             foreach (var ep in episodes) ep.IsWatched = progress.Watched.Contains(ep.Key);
             PlayerTitle.Text = FullscreenTitle.Text = selected.Title; ProviderText.Text = playbackSource!.Name;
             UpdateSourceSelectors();
-            syncingSelectors = true; EpisodeBox.ItemsSource = FullscreenEpisodeBox.ItemsSource = episodes; syncingSelectors = false;
+            SetEpisodeItemsSource();
             SyncEpisodeSelectors(episodes[index]);
             PlayerOverlay.Visibility = Visibility.Visible; await PrepareEpisodeAsync(episodes[index], resume);
         }
@@ -180,6 +180,14 @@ public partial class MainWindow : Window
         syncingSelectors = false;
         var downloaded=item.IsDownloaded?Visibility.Visible:Visibility.Collapsed;
         EpisodeDownloadedBadge.Visibility=FullscreenEpisodeDownloadedBadge.Visibility=downloaded;
+    }
+    void SetEpisodeItemsSource()
+    {
+        syncingSelectors=true;
+        // Separate views prevent one ComboBox from moving the current item of the other.
+        EpisodeBox.ItemsSource=episodes.ToList();
+        FullscreenEpisodeBox.ItemsSource=episodes.ToList();
+        syncingSelectors=false;
     }
     void RefreshEpisodeSelectors()
     {

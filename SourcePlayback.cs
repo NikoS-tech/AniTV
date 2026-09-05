@@ -48,8 +48,10 @@ public partial class MainWindow
     }
     async Task PrepareEpisodeAsync(VostEpisode episode, double resume = 0)
     {
-        mediaRequest?.Cancel(); mediaRequest?.Dispose(); mediaRequest = new();
-        var token = mediaRequest.Token;
+        mediaRequest?.Cancel(); mediaRequest?.Dispose();
+        var request = new CancellationTokenSource();
+        mediaRequest = request;
+        var token = request.Token;
         CaptureProgress(); changingSource = true; playbackTimer.Stop();
         if (isPlaying) mediaPlayer.Pause();
         QualityBox.IsEnabled = FullscreenQualityBox.IsEnabled = false;
@@ -58,7 +60,7 @@ public partial class MainWindow
         {
             var qualities = await best.GetQualitiesAsync(episode, token);
             token.ThrowIfCancellationRequested();
-            if (PlayerOverlay.Visibility != Visibility.Visible || windowClosing) return;
+            if (!ReferenceEquals(mediaRequest,request) || PlayerOverlay.Visibility != Visibility.Visible || windowClosing) return;
             syncingSelectors = true;
             QualityBox.ItemsSource = FullscreenQualityBox.ItemsSource = qualities;
             var quality = PlaybackChoice.Maximum(qualities);
@@ -70,6 +72,7 @@ public partial class MainWindow
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception ex)
         {
+            if (!ReferenceEquals(mediaRequest,request)) return;
             PlayerLoadingText.Text = "Видео недоступно: " + ex.Message;
             isPlaying = false; PlayPauseButton.Content = FullscreenPlayPauseButton.Content = "▶";
             selectedEpisode = episode;
@@ -77,7 +80,7 @@ public partial class MainWindow
         }
         finally
         {
-            if (!token.IsCancellationRequested) { changingSource = false; QualityBox.IsEnabled = FullscreenQualityBox.IsEnabled = true; }
+            if (ReferenceEquals(mediaRequest,request) && !token.IsCancellationRequested) { changingSource = false; QualityBox.IsEnabled = FullscreenQualityBox.IsEnabled = true; }
         }
     }
     async void SourceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -102,9 +105,7 @@ public partial class MainWindow
             if (index < 0) throw new InvalidOperationException("Текущая серия отсутствует на выбранном источнике.");
             episodes = list; playbackSource = source; ObserveEpisodes(anime, list);
             foreach (var ep in list) ep.IsWatched = ProgressFor(anime).Watched.Contains(ep.Key);
-            syncingSelectors = true;
-            EpisodeBox.ItemsSource = FullscreenEpisodeBox.ItemsSource = episodes;
-            syncingSelectors = false;
+            SetEpisodeItemsSource();
             selectedEpisode = episodes[index];
             SyncEpisodeSelectors(selectedEpisode);
             UpdateSourceSelectors(); ProviderText.Text = source.Name;
