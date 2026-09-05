@@ -19,7 +19,7 @@ public partial class MainWindow : Window
     readonly ObservableCollection<GenreFilterItem> genreFilters = [];
     GenreDefinition? activeGenre;
     readonly string statePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AniTV", "state.json");
-    UserState state = new(); Anime? selected; IReadOnlyList<VostEpisode> episodes = []; VostEpisode? selectedEpisode; bool isPlaying; bool changingSource; bool syncingSelectors; bool syncingVolume; bool videoStarted; bool isSeeking; long seekTarget = -1; int seekVersion; DateTime seekStartedAt; Slider? activeSeekSlider; readonly DispatcherTimer playbackTimer = new() { Interval = TimeSpan.FromMilliseconds(500) }; readonly DispatcherTimer controlsTimer = new() { Interval = TimeSpan.FromSeconds(2.5) };
+    UserState state = new(); Anime? selected; IReadOnlyList<VostEpisode> episodes = []; VostEpisode? selectedEpisode; bool isPlaying; bool changingSource; bool syncingSelectors; int episodeSelectorVersion; bool syncingVolume; bool videoStarted; bool isSeeking; long seekTarget = -1; int seekVersion; DateTime seekStartedAt; Slider? activeSeekSlider; readonly DispatcherTimer playbackTimer = new() { Interval = TimeSpan.FromMilliseconds(500) }; readonly DispatcherTimer controlsTimer = new() { Interval = TimeSpan.FromSeconds(2.5) };
     readonly LibVLC libVlc; readonly MediaPlayer mediaPlayer; Media? currentMedia;
     WindowState stateBeforeFullscreen; WindowStyle styleBeforeFullscreen; ResizeMode resizeBeforeFullscreen; Rect boundsBeforeFullscreen; bool topmostBeforeFullscreen; bool isFullscreen;
     public MainWindow()
@@ -29,7 +29,6 @@ public partial class MainWindow : Window
         InitializeDownloads();
         EpisodeBox.IsSynchronizedWithCurrentItem = false;
         FullscreenEpisodeBox.IsSynchronizedWithCurrentItem = false;
-        EpisodeBox.SelectedValuePath = FullscreenEpisodeBox.SelectedValuePath = nameof(VostEpisode.Key);
         SourceInitialized += (_, _) => InstallWindowSizingHook();
         // BitmapImage(ICO) selects its first 16px frame; use a high-resolution
         // window image independently of the multi-size Explorer/shortcut icon.
@@ -133,7 +132,8 @@ public partial class MainWindow : Window
             PlayerTitle.Text = FullscreenTitle.Text = selected.Title; ProviderText.Text = playbackSource!.Name;
             UpdateSourceSelectors();
             SetEpisodeItemsSource();
-            SyncEpisodeSelectors(episodes[index]);
+            selectedEpisode=episodes[index];
+            SyncEpisodeSelectors(selectedEpisode);
             PlayerOverlay.Visibility = Visibility.Visible; await PrepareEpisodeAsync(episodes[index], resume);
         }
         catch (OperationCanceledException) { }
@@ -155,7 +155,7 @@ public partial class MainWindow : Window
     {
         if (syncingSelectors || sender is not ComboBox { SelectedItem: VostEpisode episode }) return;
         var key=episode.Key;
-        if(key == selectedEpisode?.Key) { SyncEpisodeSelectors(episode); return; }
+        if(key == selectedEpisode?.Key) return;
         var index = episodes.ToList().FindIndex(item => item.Key == key);
         if (index < 0) return;
         await SelectEpisodeAsync(index);
@@ -177,12 +177,21 @@ public partial class MainWindow : Window
         var index = episodes.ToList().FindIndex(item => ReferenceEquals(item, episode) || item.Key == episode.Key);
         if (index < 0) return;
         var item = episodes[index];
-        syncingSelectors = true;
-        EpisodeBox.SelectedValue = item.Key;
-        FullscreenEpisodeBox.SelectedValue = item.Key;
-        syncingSelectors = false;
+        var version=++episodeSelectorVersion;
+        ApplyEpisodeSelectorIndex(index);
+        _=Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.DataBind,()=>
+        {
+            if(version==episodeSelectorVersion && selectedEpisode?.Key==item.Key) ApplyEpisodeSelectorIndex(index);
+        });
         var downloaded=item.IsDownloaded?Visibility.Visible:Visibility.Collapsed;
         EpisodeDownloadedBadge.Visibility=FullscreenEpisodeDownloadedBadge.Visibility=downloaded;
+    }
+    void ApplyEpisodeSelectorIndex(int index)
+    {
+        syncingSelectors=true;
+        EpisodeBox.SelectedIndex=-1; EpisodeBox.SelectedIndex=index;
+        FullscreenEpisodeBox.SelectedIndex=-1; FullscreenEpisodeBox.SelectedIndex=index;
+        syncingSelectors=false;
     }
     void SetEpisodeItemsSource()
     {
