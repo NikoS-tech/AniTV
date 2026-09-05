@@ -29,6 +29,8 @@ public partial class MainWindow : Window
         InitializeDownloads();
         EpisodeBox.IsSynchronizedWithCurrentItem = false;
         FullscreenEpisodeBox.IsSynchronizedWithCurrentItem = false;
+        EpisodeBox.DropDownClosed += EpisodeBox_DropDownClosed;
+        FullscreenEpisodeBox.DropDownClosed += EpisodeBox_DropDownClosed;
         SourceInitialized += (_, _) => InstallWindowSizingHook();
         // BitmapImage(ICO) selects its first 16px frame; use a high-resolution
         // window image independently of the multi-size Explorer/shortcut icon.
@@ -153,9 +155,19 @@ public partial class MainWindow : Window
     }
     async void EpisodeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (syncingSelectors || sender is not ComboBox { SelectedItem: VostEpisode episode }) return;
+        if (syncingSelectors || sender is not ComboBox box || box.IsDropDownOpen) return;
+        await SelectEpisodeFromBoxAsync(box);
+    }
+    async void EpisodeBox_DropDownClosed(object? sender, EventArgs e)
+    {
+        if(syncingSelectors || sender is not ComboBox box) return;
+        await SelectEpisodeFromBoxAsync(box);
+    }
+    async Task SelectEpisodeFromBoxAsync(ComboBox box)
+    {
+        if(box.SelectedItem is not VostEpisode episode) return;
         var key=episode.Key;
-        if(key == selectedEpisode?.Key) return;
+        if(key==selectedEpisode?.Key) { SyncEpisodeSelectors(selectedEpisode); return; }
         var index = episodes.ToList().FindIndex(item => item.Key == key);
         if (index < 0) return;
         await SelectEpisodeAsync(index);
