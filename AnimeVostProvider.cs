@@ -1,21 +1,25 @@
 using System.Net;
 using System.Net.Http;
+using System.ComponentModel;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace AniTV;
 
 public sealed record VostTitle(string Id, string Name, Uri PageUrl);
-public sealed record VostEpisode(string Name, Uri StandardUrl, Uri HdUrl, Uri? PreviewUrl)
+public sealed record VostEpisode(string Name, Uri StandardUrl, Uri HdUrl, Uri? PreviewUrl) : INotifyPropertyChanged
 {
+    bool isWatched;
+    bool isDownloaded;
     public string LegacyKey => System.IO.Path.GetFileNameWithoutExtension(StandardUrl.AbsolutePath);
     public string Key => Number > 0 ? "episode:" + Number : "special:" + Referrer + Name;
     public string Referrer { get; init; } = "https://v13.vost.pw/";
     public bool IsHls { get; init; }
     public int Number => int.TryParse(Regex.Match(Name, @"^\s*(\d+)\s*(?:серия|эпизод)?\s*$", RegexOptions.IgnoreCase).Groups[1].Value, out var n) ? n : 0;
-    public bool IsWatched { get; set; }
-    public bool IsDownloaded { get; set; }
+    public bool IsWatched { get => isWatched; set { if(isWatched==value) return; isWatched=value; PropertyChanged?.Invoke(this,new(nameof(IsWatched))); PropertyChanged?.Invoke(this,new(nameof(DisplayName))); } }
+    public bool IsDownloaded { get => isDownloaded; set { if(isDownloaded==value) return; isDownloaded=value; PropertyChanged?.Invoke(this,new(nameof(IsDownloaded))); PropertyChanged?.Invoke(this,new(nameof(DisplayName))); } }
     public string DisplayName => (IsDownloaded ? "↓  " : "") + (IsWatched ? "✓  " : "") + Name;
+    public event PropertyChangedEventHandler? PropertyChanged;
     public override string ToString() => Name;
 }
 

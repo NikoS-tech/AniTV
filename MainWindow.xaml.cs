@@ -29,6 +29,7 @@ public partial class MainWindow : Window
         InitializeDownloads();
         EpisodeBox.IsSynchronizedWithCurrentItem = false;
         FullscreenEpisodeBox.IsSynchronizedWithCurrentItem = false;
+        EpisodeBox.SelectedValuePath = FullscreenEpisodeBox.SelectedValuePath = nameof(VostEpisode.Key);
         SourceInitialized += (_, _) => InstallWindowSizingHook();
         // BitmapImage(ICO) selects its first 16px frame; use a high-resolution
         // window image independently of the multi-size Explorer/shortcut icon.
@@ -152,14 +153,14 @@ public partial class MainWindow : Window
     }
     async void EpisodeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (syncingSelectors || sender is not ComboBox { SelectedItem: VostEpisode episode }) return;
-        var index = episodes.ToList().FindIndex(item => ReferenceEquals(item, episode) || item.Key == episode.Key);
+        if (syncingSelectors || sender is not ComboBox { SelectedValue: string key } || key == selectedEpisode?.Key) return;
+        var index = episodes.ToList().FindIndex(item => item.Key == key);
         if (index < 0) return;
         await SelectEpisodeAsync(index);
     }
     void QualityBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!IsLoaded || syncingSelectors || changingSource || sender is not ComboBox box || EpisodeBox.SelectedItem is not VostEpisode episode || PlayerOverlay.Visibility != Visibility.Visible) return; syncingSelectors = true; if (box == QualityBox) FullscreenQualityBox.SelectedIndex = box.SelectedIndex; else QualityBox.SelectedIndex = box.SelectedIndex; syncingSelectors = false; var position = mediaPlayer.Time; PlayEpisode(episode, Math.Max(0, position / 1000d));
+        if (!IsLoaded || syncingSelectors || changingSource || sender is not ComboBox box || selectedEpisode is not VostEpisode episode || PlayerOverlay.Visibility != Visibility.Visible) return; syncingSelectors = true; if (box == QualityBox) FullscreenQualityBox.SelectedIndex = box.SelectedIndex; else QualityBox.SelectedIndex = box.SelectedIndex; syncingSelectors = false; var position = mediaPlayer.Time; PlayEpisode(episode, Math.Max(0, position / 1000d));
     }
     async Task SelectEpisodeAsync(int index)
     {
@@ -175,8 +176,8 @@ public partial class MainWindow : Window
         if (index < 0) return;
         var item = episodes[index];
         syncingSelectors = true;
-        EpisodeBox.SelectedIndex = index;
-        FullscreenEpisodeBox.SelectedIndex = index;
+        EpisodeBox.SelectedValue = item.Key;
+        FullscreenEpisodeBox.SelectedValue = item.Key;
         syncingSelectors = false;
         var downloaded=item.IsDownloaded?Visibility.Visible:Visibility.Collapsed;
         EpisodeDownloadedBadge.Visibility=FullscreenEpisodeDownloadedBadge.Visibility=downloaded;
@@ -189,18 +190,9 @@ public partial class MainWindow : Window
         FullscreenEpisodeBox.ItemsSource=episodes.ToList();
         syncingSelectors=false;
     }
-    void RefreshEpisodeSelectors()
-    {
-        var current=selectedEpisode ?? activeEpisode;
-        syncingSelectors=true;
-        EpisodeBox.Items.Refresh();
-        FullscreenEpisodeBox.Items.Refresh();
-        syncingSelectors=false;
-        if(current is not null) SyncEpisodeSelectors(current);
-    }
     async Task MoveEpisodeAsync(int direction)
     {
-        var current = selectedEpisode ?? EpisodeBox.SelectedItem as VostEpisode ?? activeEpisode;
+        var current = selectedEpisode ?? activeEpisode;
         var index = EpisodeNavigation.AdjacentIndex(episodes, current, direction);
         if (index >= 0) await SelectEpisodeAsync(index);
     }
@@ -237,8 +229,9 @@ public partial class MainWindow : Window
     void ClosePlayer_Click(object sender, RoutedEventArgs e) { StopPlayerSession(); if (libraryMode) ShowLibrary(); }
     async void VideoPlayer_MediaEnded()
     {
+        if (!videoStarted || mediaPlayer.Length <= 0 || mediaPlayer.Time < mediaPlayer.Length * 0.8) return;
         CaptureProgress(true);
-        var next = EpisodeNavigation.AdjacentIndex(episodes, selectedEpisode ?? EpisodeBox.SelectedItem as VostEpisode ?? activeEpisode, 1);
+        var next = EpisodeNavigation.AdjacentIndex(episodes, selectedEpisode ?? activeEpisode, 1);
         if (next >= 0) await SelectEpisodeAsync(next);
         else { isPlaying = false; PlayPauseButton.Content = FullscreenPlayPauseButton.Content = "▶"; }
     }

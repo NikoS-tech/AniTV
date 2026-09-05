@@ -71,13 +71,12 @@ public partial class MainWindow
     {
         if (activeAnime is null) return;
         var progress = ProgressFor(activeAnime);
-        var changed = false;
         foreach (var episode in episodes)
         {
             var watched = progress.Watched.Contains(episode.Key);
-            if (episode.IsWatched != watched) { episode.IsWatched = watched; changed = true; }
+            episode.IsWatched = watched;
         }
-        if (changed) RefreshEpisodeSelectors();
+        if(selectedEpisode is not null) SyncEpisodeSelectors(selectedEpisode);
         UpdateDetailCheckpoint(progress);
     }
 

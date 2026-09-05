@@ -49,6 +49,13 @@ Check((await repeated.TakeAsync(50)).Count == 1 && !repeated.HasMore, "Repeated 
 var reversedEpisodes = new[] { 3, 2, 1 }.Select(n => new VostEpisode($"{n} серия", new Uri($"https://example.org/{n}"), new Uri($"https://example.org/{n}"), null)).ToList();
 Check(EpisodeNavigation.AdjacentIndex(reversedEpisodes, reversedEpisodes[1], 1) == 0, "Next episode follows the greater episode number even in reversed source order");
 Check(EpisodeNavigation.AdjacentIndex(reversedEpisodes, reversedEpisodes[1], -1) == 2, "Previous episode follows the smaller episode number even in reversed source order");
+var labelChanges = 0;
+reversedEpisodes[1].PropertyChanged += (_, e) => { if(e.PropertyName == nameof(VostEpisode.DisplayName)) labelChanges++; };
+reversedEpisodes[1].IsWatched = true;
+reversedEpisodes[1].IsDownloaded = true;
+Check(labelChanges == 2 && reversedEpisodes[1].DisplayName.Contains("✓") && reversedEpisodes[1].DisplayName.Contains("↓"), "Episode badges update without refreshing selector items");
+var detachedCurrent = new VostEpisode("2 серия", new Uri("https://mirror.example.org/2"), new Uri("https://mirror.example.org/2"), null);
+Check(EpisodeNavigation.AdjacentIndex(reversedEpisodes, detachedCurrent, 1) == 0, "Episode navigation survives replacement instances by stable key");
 if (args.Contains("--live-catalog"))
 {
     var livePager = new CatalogPager(new AnimeVostProvider().GetCatalogPageAsync);

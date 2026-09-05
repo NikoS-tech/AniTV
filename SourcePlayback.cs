@@ -13,7 +13,7 @@ public partial class MainWindow
     {
         var preferred = ProgressFor(anime).LastSourceKey;
         Exception? failure = null;
-        foreach (var source in anime.Sources.Where(s => string.IsNullOrEmpty(preferred) || s.Key == preferred))
+        foreach (var source in anime.Sources.OrderByDescending(s => s.Key == preferred))
         {
             try
             {
@@ -85,13 +85,13 @@ public partial class MainWindow
     }
     async void SourceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (syncingSelectors || sender is not ComboBox { SelectedItem: AnimeSource source } || selected is null || source.Key == playbackSource?.Key) return;
+        if (syncingSelectors || changingSource || sender is not ComboBox { SelectedItem: AnimeSource source } || selected is null || source.Key == playbackSource?.Key) return;
         CaptureProgress();
         mediaRequest?.Cancel(); mediaRequest?.Dispose(); mediaRequest = new();
         var token = mediaRequest.Token;
         var anime = selected;
         var previousSource = playbackSource;
-        var key = activeEpisode?.Key;
+        var key = (selectedEpisode ?? activeEpisode)?.Key;
         changingSource = true; playbackTimer.Stop(); if (isPlaying) mediaPlayer.Pause();
         PlayerLoading.Visibility = Visibility.Visible; PlayerLoadingText.Text = "Загружаем источник…";
         SourceBox.IsEnabled = FullscreenSourceBox.IsEnabled = EpisodeBox.IsEnabled = FullscreenEpisodeBox.IsEnabled = QualityBox.IsEnabled = FullscreenQualityBox.IsEnabled = false;
