@@ -242,11 +242,21 @@ public partial class MainWindow : Window
         }
     }
     void Window_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.F11) { ToggleFullscreen(); e.Handled = true; } else if (e.Key == Key.Escape && isFullscreen) { ToggleFullscreen(); e.Handled = true; } }
-    void Player_PreviewKeyDown(object sender, KeyEventArgs e)
+    async void Player_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if(e.Handled || e.Key!=Key.Space || !PlayerActive || Keyboard.Modifiers!=ModifierKeys.None) return;
-        e.Handled=true;
-        if(!e.IsRepeat && !changingSource) PlayPause_Click(sender,e);
+        if(e.Handled || !PlayerActive) return;
+        if(Keyboard.Modifiers==ModifierKeys.Shift && e.Key is Key.Left or Key.Right)
+        {
+            e.Handled=true;
+            if(!e.IsRepeat && !changingSource)
+                await MoveEpisodeAsync(e.Key==Key.Right ? 1 : -1);
+            return;
+        }
+        if(e.Key==Key.Space && Keyboard.Modifiers==ModifierKeys.None)
+        {
+            e.Handled=true;
+            if(!e.IsRepeat && !changingSource) PlayPause_Click(sender,e);
+        }
     }
     void Player_PreviewKeyUp(object sender, KeyEventArgs e)
     {
