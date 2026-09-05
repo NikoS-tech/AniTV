@@ -153,7 +153,9 @@ public partial class MainWindow : Window
     }
     async void EpisodeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (syncingSelectors || sender is not ComboBox { SelectedValue: string key } || key == selectedEpisode?.Key) return;
+        if (syncingSelectors || sender is not ComboBox { SelectedItem: VostEpisode episode }) return;
+        var key=episode.Key;
+        if(key == selectedEpisode?.Key) { SyncEpisodeSelectors(episode); return; }
         var index = episodes.ToList().FindIndex(item => item.Key == key);
         if (index < 0) return;
         await SelectEpisodeAsync(index);
