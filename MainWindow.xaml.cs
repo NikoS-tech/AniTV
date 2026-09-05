@@ -43,6 +43,11 @@ public partial class MainWindow : Window
         libVlc = new LibVLC("--network-caching=1500", "--http-referrer=https://v13.vost.pw/", "--http-user-agent=AniTV/1.0");
         mediaPlayer = new MediaPlayer(libVlc);
         videoOverlayContent = VideoOverlayRoot;
+        PreviewKeyDown += Player_PreviewKeyDown;
+        PreviewKeyUp += Player_PreviewKeyUp;
+        // VLC hosts fullscreen controls in a separate overlay window.
+        VideoOverlayRoot.PreviewKeyDown += Player_PreviewKeyDown;
+        VideoOverlayRoot.PreviewKeyUp += Player_PreviewKeyUp;
         VideoPlayer.Content = null; VideoPlayer.Visibility = Visibility.Collapsed; PlayerVideoBorder.Child = null;
         mediaPlayer.Playing += (_, _) => DispatchPlayback(() => { videoStarted = true; isPlaying = true; PlayPauseButton.Content = FullscreenPlayPauseButton.Content = "Ⅱ"; playbackTimer.Start(); CaptureProgress(); });
         mediaPlayer.Buffering += (_, e) => DispatchPlayback(() => { if (!videoStarted && e.Cache < 100) { PlayerLoading.Visibility = Visibility.Visible; PlayerLoadingText.Text = "Буферизация…"; } });
@@ -236,7 +241,17 @@ public partial class MainWindow : Window
             controlsTimer.Stop(); Mouse.OverrideCursor = null; FullscreenChrome.Visibility = Visibility.Collapsed; Grid.SetRowSpan(PlayerVideoHost, 1); Grid.SetRow(PlayerVideoHost, 1); PlayerHeader.Visibility = Visibility.Visible; PlayerControls.Visibility = Visibility.Visible; PlayerVideoHost.Margin = new Thickness(22,16,22,8); PlayerVideoBorder.CornerRadius = new CornerRadius(14); isFullscreen = false; FullscreenButton.Content = "⛶  Полный экран";
         }
     }
-    void Window_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.F11) { ToggleFullscreen(); e.Handled = true; } else if (e.Key == Key.Escape && isFullscreen) { ToggleFullscreen(); e.Handled = true; } else if (e.Key == Key.Space && PlayerOverlay.Visibility == Visibility.Visible) { PlayPause_Click(sender, e); e.Handled = true; } }
+    void Window_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.F11) { ToggleFullscreen(); e.Handled = true; } else if (e.Key == Key.Escape && isFullscreen) { ToggleFullscreen(); e.Handled = true; } }
+    void Player_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if(e.Handled || e.Key!=Key.Space || !PlayerActive || Keyboard.Modifiers!=ModifierKeys.None) return;
+        e.Handled=true;
+        if(!e.IsRepeat && !changingSource) PlayPause_Click(sender,e);
+    }
+    void Player_PreviewKeyUp(object sender, KeyEventArgs e)
+    {
+        if(e.Key==Key.Space && PlayerActive && Keyboard.Modifiers==ModifierKeys.None) e.Handled=true;
+    }
     void Window_MouseMove(object sender, MouseEventArgs e) => RevealFullscreenControls();
     void VideoSurface_MouseMove(object sender, MouseEventArgs e) => RevealFullscreenControls();
     void RevealFullscreenControls() { if (!PlayerActive || !isFullscreen) return; SetFullscreenControls(true); controlsTimer.Stop(); controlsTimer.Start(); }
