@@ -175,8 +175,8 @@ public partial class MainWindow : Window
         if (index < 0) return;
         var item = episodes[index];
         syncingSelectors = true;
-        EpisodeBox.SelectedItem = item;
-        FullscreenEpisodeBox.SelectedItem = item;
+        EpisodeBox.SelectedIndex = index;
+        FullscreenEpisodeBox.SelectedIndex = index;
         syncingSelectors = false;
         var downloaded=item.IsDownloaded?Visibility.Visible:Visibility.Collapsed;
         EpisodeDownloadedBadge.Visibility=FullscreenEpisodeDownloadedBadge.Visibility=downloaded;
