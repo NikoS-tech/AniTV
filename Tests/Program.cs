@@ -50,9 +50,11 @@ var reversedEpisodes = new[] { 3, 2, 1 }.Select(n => new VostEpisode($"{n} се�
 Check(EpisodeNavigation.AdjacentIndex(reversedEpisodes, reversedEpisodes[1], 1) == 0, "Next episode follows the greater episode number even in reversed source order");
 Check(EpisodeNavigation.AdjacentIndex(reversedEpisodes, reversedEpisodes[1], -1) == 2, "Previous episode follows the smaller episode number even in reversed source order");
 var labelChanges = 0;
+var selectedItems = new HashSet<VostEpisode> { reversedEpisodes[1] };
 reversedEpisodes[1].PropertyChanged += (_, e) => { if(e.PropertyName == nameof(VostEpisode.DisplayName)) labelChanges++; };
 reversedEpisodes[1].IsWatched = true;
 reversedEpisodes[1].IsDownloaded = true;
+Check(selectedItems.Contains(reversedEpisodes[1]), "Selection identity survives badge changes and binding subscriptions");
 Check(labelChanges == 2 && reversedEpisodes[1].DisplayName.Contains("✓") && reversedEpisodes[1].DisplayName.Contains("↓"), "Episode badges update without refreshing selector items");
 var detachedCurrent = new VostEpisode("2 серия", new Uri("https://mirror.example.org/2"), new Uri("https://mirror.example.org/2"), null);
 Check(EpisodeNavigation.AdjacentIndex(reversedEpisodes, detachedCurrent, 1) == 0, "Episode navigation survives replacement instances by stable key");

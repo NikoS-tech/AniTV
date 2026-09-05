@@ -7,8 +7,13 @@ using System.Text.RegularExpressions;
 namespace AniTV;
 
 public sealed record VostTitle(string Id, string Name, Uri PageUrl);
-public sealed record VostEpisode(string Name, Uri StandardUrl, Uri HdUrl, Uri? PreviewUrl) : INotifyPropertyChanged
+public sealed class VostEpisode(string name, Uri standardUrl, Uri hdUrl, Uri? previewUrl) : INotifyPropertyChanged
 {
+    // WPF Selector hashes its items. Mutable flags/subscriptions must not change identity.
+    public string Name { get; } = name;
+    public Uri StandardUrl { get; } = standardUrl;
+    public Uri HdUrl { get; } = hdUrl;
+    public Uri? PreviewUrl { get; } = previewUrl;
     bool isWatched;
     bool isDownloaded;
     public string LegacyKey => System.IO.Path.GetFileNameWithoutExtension(StandardUrl.AbsolutePath);

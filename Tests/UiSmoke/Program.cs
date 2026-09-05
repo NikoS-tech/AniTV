@@ -9,6 +9,7 @@ internal static class Program
     [STAThread]
     static void Main(string[] args)
     {
+        if(args.Contains("--episode-selection")) { EpisodeSelectionChecks.Run(); return; }
         var app = new App(); app.InitializeComponent();
         var window = new MainWindow();
         if (args.Contains("--live-hls"))
