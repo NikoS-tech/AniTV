@@ -81,7 +81,7 @@ public partial class MainWindow
         await downloadService.DownloadAsync(item);
         UpdateDownloadsSummary();
         if(!item.IsComplete) return;
-        episode.IsDownloaded=true; EpisodeBox.Items.Refresh(); FullscreenEpisodeBox.Items.Refresh(); if(selectedEpisode==episode) SyncEpisodeSelectors(episode); LoadDownloadedFiles();
+        episode.IsDownloaded=true; RefreshEpisodeSelectors(); LoadDownloadedFiles();
     }
 
     void MarkDownloaded(Anime anime,IEnumerable<VostEpisode> list)
@@ -165,7 +165,7 @@ public partial class MainWindow
         {
             File.Delete(item.OutputPath); downloads.Remove(item);
             var folder=Path.GetDirectoryName(item.OutputPath); if(folder is not null && Directory.Exists(folder) && !Directory.EnumerateFileSystemEntries(folder).Any()) Directory.Delete(folder);
-            if(selected is not null) {MarkDownloaded(selected,episodes); EpisodeBox.Items.Refresh(); FullscreenEpisodeBox.Items.Refresh(); if(selectedEpisode is not null) SyncEpisodeSelectors(selectedEpisode);}
+            if(selected is not null) {MarkDownloaded(selected,episodes); RefreshEpisodeSelectors();}
             DownloadsEmpty.Visibility=downloads.Count==0?Visibility.Visible:Visibility.Collapsed;
             UpdateDownloadsSummary();
         }

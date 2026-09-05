@@ -72,10 +72,8 @@ public partial class MainWindow
         {
             PlayerLoadingText.Text = "Видео недоступно: " + ex.Message;
             isPlaying = false; PlayPauseButton.Content = FullscreenPlayPauseButton.Content = "▶";
-            syncingSelectors = true;
-            EpisodeBox.SelectedItem = FullscreenEpisodeBox.SelectedItem = activeEpisode;
-            syncingSelectors = false;
-            selectedEpisode = activeEpisode;
+            selectedEpisode = episode;
+            SyncEpisodeSelectors(episode);
         }
         finally
         {

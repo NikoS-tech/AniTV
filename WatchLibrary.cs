@@ -77,7 +77,7 @@ public partial class MainWindow
             var watched = progress.Watched.Contains(episode.Key);
             if (episode.IsWatched != watched) { episode.IsWatched = watched; changed = true; }
         }
-        if (changed) { EpisodeBox.Items.Refresh(); FullscreenEpisodeBox.Items.Refresh(); }
+        if (changed) RefreshEpisodeSelectors();
         UpdateDetailCheckpoint(progress);
     }
 

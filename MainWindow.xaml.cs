@@ -152,9 +152,9 @@ public partial class MainWindow : Window
     }
     async void EpisodeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (syncingSelectors || sender is not ComboBox box) return;
-        var index = box.SelectedIndex;
-        if (index < 0 || index >= episodes.Count) return;
+        if (syncingSelectors || sender is not ComboBox { SelectedItem: VostEpisode episode }) return;
+        var index = episodes.ToList().FindIndex(item => ReferenceEquals(item, episode) || item.Key == episode.Key);
+        if (index < 0) return;
         await SelectEpisodeAsync(index);
     }
     void QualityBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -180,6 +180,15 @@ public partial class MainWindow : Window
         syncingSelectors = false;
         var downloaded=item.IsDownloaded?Visibility.Visible:Visibility.Collapsed;
         EpisodeDownloadedBadge.Visibility=FullscreenEpisodeDownloadedBadge.Visibility=downloaded;
+    }
+    void RefreshEpisodeSelectors()
+    {
+        var current=selectedEpisode ?? activeEpisode;
+        syncingSelectors=true;
+        EpisodeBox.Items.Refresh();
+        FullscreenEpisodeBox.Items.Refresh();
+        syncingSelectors=false;
+        if(current is not null) SyncEpisodeSelectors(current);
     }
     async Task MoveEpisodeAsync(int direction)
     {
