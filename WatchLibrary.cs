@@ -13,6 +13,7 @@ public partial class MainWindow
     bool libraryMode;
     bool completedMode;
     bool refreshingLibrary;
+    bool stateRecoveryBlocked;
     DateTime lastCheckpoint = DateTime.MinValue;
 
     WatchProgress ProgressFor(Anime anime)
@@ -194,22 +195,25 @@ public partial class MainWindow
                 }
                 return;
             }
-            catch { StatusText.Text = "Не удалось прочитать сохранения; проверяется резервная копия."; }
+            catch(Exception ex)
+            {
+                AppDiagnostics.Write("state.load.failed",ex);
+                try { StateFile.Quarantine(path); }
+                catch(Exception backupError) { stateRecoveryBlocked=true; AppDiagnostics.Write("state.quarantine.failed",backupError); }
+                StatusText.Text = "Не удалось прочитать сохранения; проверяется резервная копия.";
+            }
         }
         state = new();
     }
 
     bool SaveState()
     {
+        if(stateRecoveryBlocked) { StatusText.Text="Сохранение приостановлено: не удалось создать копию повреждённых данных."; return false; }
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(statePath)!);
-            var temporary = statePath + ".tmp";
-            File.WriteAllText(temporary, JsonSerializer.Serialize(state));
-            if (File.Exists(statePath)) File.Replace(temporary, statePath, statePath + ".bak");
-            else File.Move(temporary, statePath);
+            StateFile.Write(statePath,JsonSerializer.Serialize(state));
             return true;
         }
-        catch (Exception ex) { StatusText.Text = "Не удалось сохранить прогресс: " + ex.Message; return false; }
+        catch (Exception ex) { AppDiagnostics.Write("state.save.failed",ex); StatusText.Text = "Не удалось сохранить прогресс: " + ex.Message; return false; }
     }
 }

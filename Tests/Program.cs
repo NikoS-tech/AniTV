@@ -2,6 +2,20 @@ using AniTV;
 using System.Text.Json;
 
 var count = 0;
+var storageTestDirectory=Path.Combine(Path.GetTempPath(),"AniTV-state-test-"+Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(storageTestDirectory);
+try
+{
+    var storagePath=Path.Combine(storageTestDirectory,"state.json");
+    StateFile.Write(storagePath,"{\"version\":1}");
+    StateFile.Write(storagePath,"{\"version\":2}");
+    Check(File.ReadAllText(storagePath)=="{\"version\":2}" && File.ReadAllText(storagePath+".bak")=="{\"version\":1}","Atomic save preserves previous version");
+    var recoveryPath=StateFile.Quarantine(storagePath);
+    StateFile.Write(storagePath,"{}");
+    Check(File.ReadAllText(recoveryPath)=="{\"version\":2}","Recovery copy survives subsequent saves");
+    Check(!Directory.EnumerateFiles(storageTestDirectory,"*.tmp").Any(),"Successful saves leave no temporary files");
+}
+finally { Directory.Delete(storageTestDirectory,true); }
 await SourceTests.Run(args);
 void Check(bool result, string name) { if (!result) throw new Exception(name); Console.WriteLine("PASS: " + name); count++; }
 var progress = new WatchProgress();

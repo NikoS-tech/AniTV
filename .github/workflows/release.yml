@@ -18,6 +18,8 @@ jobs:
           dotnet-version: "8.0.x"
       - run: dotnet restore Tests/WatchTests.csproj --configfile NuGet.Config
       - run: dotnet run --project Tests/WatchTests.csproj --no-restore
+      - run: dotnet run --project Tests/UiSmoke/UiSmoke.csproj -- --episode-selection
+      - run: dotnet run --project Tests/UiSmoke/UiSmoke.csproj
 
   build:
     needs: test

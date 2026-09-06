@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup><Compile Include="../StateFile.cs" Link="StateFile.cs"/></ItemGroup>
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
   <ItemGroup><Compile Remove="UiSmoke/**/*.cs"/><Compile Include="../Models.cs" Link="Models.cs"/><Compile Include="../AnimeVostProvider.cs" Link="AnimeVostProvider.cs"/><Compile Include="../CatalogPager.cs" Link="CatalogPager.cs"/></ItemGroup>
   <ItemGroup><Compile Include="../AnimeSources.cs" Link="AnimeSources.cs"/><Compile Include="../AnimeBestProvider.cs" Link="AnimeBestProvider.cs"/><Compile Include="../MultiSourceCatalog.cs" Link="MultiSourceCatalog.cs"/></ItemGroup>

@@ -3,6 +3,20 @@ using System.Net.Http;
 
 static class SourceTests
 {
+    sealed class RetryCatalogHandler(bool best) : HttpMessageHandler
+    {
+        public int Attempts;
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        {
+            if(!best) return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content=new StringContent("") });
+            if(request.RequestUri!.AbsolutePath.EndsWith(".html"))
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content=new StringContent("<h1>Тест [1-3 из 12]</h1>") });
+            Attempts++;
+            if(Attempts==1) throw new HttpRequestException("Temporary outage");
+            if(request.RequestUri.AbsolutePath != "/") throw new Exception("Retry skipped the failed provider page");
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content=new StringContent("<h2><a href=\"https://anime1.best/1-test.html\">Тест [1-3 из 12]</a></h2>") });
+        }
+    }
     sealed class CachedCatalogHandler : HttpMessageHandler
     {
         public int ListRequests, DetailRequests;
@@ -25,6 +39,13 @@ static class SourceTests
     public static async Task Run(string[] args)
     {
         void Check(bool ok, string name) { if (!ok) throw new Exception(name); Console.WriteLine("PASS: " + name); }
+        var retryHandler=new RetryCatalogHandler(true);
+        var retryCatalog=new MultiSourceCatalog(new AnimeVostProvider(new HttpClient(new RetryCatalogHandler(false))),new AnimeBestProvider(new HttpClient(retryHandler)),new UserState());
+        var transientFailed=false;
+        try { await retryCatalog.FetchPageAsync(1,CancellationToken.None); }
+        catch(InvalidOperationException) { transientFailed=true; }
+        Check(transientFailed,"Provider failure is not treated as end of catalog");
+        Check((await retryCatalog.FetchPageAsync(1,CancellationToken.None)).Count==1 && retryHandler.Attempts==2,"Retry resumes failed provider at the same page");
         Check(CatalogGenres.All.Count >= 20 && CatalogGenres.All.Select(g=>g.Name).Distinct().Count()==CatalogGenres.All.Count, "Genre catalog has unique common filters");
         Check(CatalogGenres.All.All(g=>g.VostSlug.Length>0 && g.BestPath.Length>0), "Each genre maps both providers");
         Check(CatalogGenres.All.Select((g,i)=>GenreChip.CreateFilter(g.Name,i).Background).Distinct().Count()==CatalogGenres.All.Count, "Every catalog genre has a unique chip color");

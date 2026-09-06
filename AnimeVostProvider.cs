@@ -40,6 +40,7 @@ public sealed partial class AnimeVostProvider
         http.DefaultRequestHeaders.Referrer = Site;
         http.Timeout = TimeSpan.FromSeconds(20);
     }
+    public AnimeVostProvider(HttpClient client) { http = client; }
 
     public async Task<List<Anime>> GetCatalogAsync(string? search = null, CancellationToken cancellationToken = default)
     {

@@ -43,18 +43,24 @@ public sealed class MultiSourceCatalog(AnimeVostProvider vost, AnimeBestProvider
         }
     }
     bool vostEnded, bestEnded;
+    int vostPage = 1, bestPage = 1;
     public string Warning { get; private set; } = "";
     public async Task<List<Anime>> FetchPageAsync(int page, CancellationToken token)
     {
-        var v = FetchSafe(() => vostEnded ? Task.FromResult(new List<Anime>()) : genre is null ? vost.GetCatalogPageAsync(page, token) : vost.GetGenrePageAsync(genre.VostSlug,page,token), token);
-        var b = FetchSafe(() => bestEnded ? Task.FromResult(new List<Anime>()) : genre is null ? best.GetCatalogPageAsync(page, token) : best.GetGenrePageAsync(genre.BestPath,page,token), token);
+        var v = FetchSafe(() => vostEnded ? Task.FromResult(new List<Anime>()) : genre is null ? vost.GetCatalogPageAsync(vostPage, token) : vost.GetGenrePageAsync(genre.VostSlug,vostPage,token), token);
+        var b = FetchSafe(() => bestEnded ? Task.FromResult(new List<Anime>()) : genre is null ? best.GetCatalogPageAsync(bestPage, token) : best.GetGenrePageAsync(genre.BestPath,bestPage,token), token);
         await Task.WhenAll(v, b);
         token.ThrowIfCancellationRequested();
         if (v.Result.Error is not null && b.Result.Error is not null) throw new InvalidOperationException("Оба источника недоступны.");
+        // An unavailable provider keeps its page cursor for a retry; never mark an error as EOF.
+        if(v.Result.Rows.Count == 0 && b.Result.Rows.Count == 0 && (v.Result.Error is not null || b.Result.Error is not null))
+            throw new InvalidOperationException("Не удалось загрузить следующую страницу источника. Повторите загрузку.");
+        Warning = "";
         if (v.Result.Error is not null) Warning = "AnimeVost недоступен; повторите обновление позже";
         if (b.Result.Error is not null) Warning = "AnimeBest недоступен; повторите обновление позже";
         var vr = NewSources(v.Result.Rows); var br = NewSources(b.Result.Rows);
-        vostEnded |= vr.Count == 0; bestEnded |= br.Count == 0;
+        if(v.Result.Error is null) { vostEnded |= vr.Count == 0; vostPage++; }
+        if(b.Result.Error is null) { bestEnded |= br.Count == 0; bestPage++; }
         return vr.ZipLongest(br).Select(Resolve).DistinctBy(a => a.Id).ToList();
     }
     List<Anime> NewSources(List<Anime> rows) => rows.Where(a => { SourceMatching.EnsureSource(a); return seenSources.Add(a.Sources[0].Key); }).ToList();

@@ -42,7 +42,7 @@ internal static class Program
             "Preview poster keeps its whole aspect ratio and does not stretch the dialog height");
         var detailPanel = (Border)Field("DetailPanel")!;
         var detailSidebar = (StackPanel)Field("DetailSidebar")!;
-        Check(Grid.GetColumn((UIElement)Field("FavoriteButton")!) == 0 && Grid.GetColumn((UIElement)Field("WatchButton")!) == 1 && Grid.GetColumn((UIElement)Field("DetailProgress")!) == 2, "Preview actions are favorite, watch, then checkpoint");
+        Check(Grid.GetColumn((UIElement)Field("FavoriteButton")!) == 0 && Grid.GetColumn((UIElement)Field("WatchButton")!) == 1 && Grid.GetColumn((UIElement)Field("DetailProgress")!) == 3, "Preview actions are favorite, watch, download, then checkpoint");
         Check(Grid.GetRow((UIElement)Field("DetailDescriptionScroll")!) == 1, "Description scroll is below the fixed action header");
         Check(detailSidebar.Children.Contains((UIElement)Field("DetailMeta")!) && detailSidebar.Children.Contains((UIElement)Field("DetailGenres")!), "Metadata and genre chips are below the poster");
         Check(Field("DetailGenres") is ItemsControl { ItemTemplate: not null }, "Genres use chip item templates");
