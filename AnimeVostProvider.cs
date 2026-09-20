@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http;
+using System.IO;
 using System.ComponentModel;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -19,6 +20,10 @@ public sealed class VostEpisode(string name, Uri standardUrl, Uri hdUrl, Uri? pr
     public string LegacyKey => System.IO.Path.GetFileNameWithoutExtension(StandardUrl.AbsolutePath);
     public string Key => Number > 0 ? "episode:" + Number : "special:" + Referrer + Name;
     public string Referrer { get; init; } = "https://v13.vost.pw/";
+    // The source owns the playback protocol.  It must not be inferred from a
+    // URL: AnimeVost currently serves signed MP4 links while AnimeBest uses HLS.
+    public string Provider { get; init; } = "";
+    public string? PlaybackId { get; init; }
     public bool IsHls { get; init; }
     public int Number => int.TryParse(Regex.Match(Name, @"^\s*(\d+)\s*(?:серия|эпизод)?\s*$", RegexOptions.IgnoreCase).Groups[1].Value, out var n) ? n : 0;
     public bool IsWatched { get => isWatched; set { if(isWatched==value) return; isWatched=value; PropertyChanged?.Invoke(this,new(nameof(IsWatched))); PropertyChanged?.Invoke(this,new(nameof(DisplayName))); } }
@@ -31,7 +36,6 @@ public sealed class VostEpisode(string name, Uri standardUrl, Uri hdUrl, Uri? pr
 public sealed partial class AnimeVostProvider
 {
     static readonly Uri Site = new("https://v13.vost.pw/");
-    static readonly Uri PlaylistEndpoint = new("https://api.animevost.org/v1/playlist");
     readonly HttpClient http = new(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.All });
 
     public AnimeVostProvider()
@@ -121,23 +125,64 @@ public sealed partial class AnimeVostProvider
         return null;
     }
 
-    public async Task<IReadOnlyList<VostEpisode>> GetEpisodesAsync(string titleId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<VostEpisode>> GetEpisodesAsync(AnimeSource source, CancellationToken cancellationToken = default)
     {
-        using var body = new FormUrlEncodedContent(new Dictionary<string, string> { ["id"] = titleId });
-        using var request = new HttpRequestMessage(HttpMethod.Post, PlaylistEndpoint) { Content = body };
-        request.Headers.Referrer = Site;
-        using var response = await http.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        var rows = JsonSerializer.Deserialize<List<PlaylistRow>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
-        return rows.Where(x => Uri.TryCreate(x.Std, UriKind.Absolute, out _) && Uri.TryCreate(x.Hd, UriKind.Absolute, out _))
-            .Select(x => new VostEpisode(x.Name ?? "Серия", new Uri(x.Std!), new Uri(x.Hd!), Uri.TryCreate(x.Preview, UriKind.Absolute, out var p) ? p : null)).OrderBy(x => x.Number).ToList();
+        if (!Uri.TryCreate(source.PageUrl, UriKind.Absolute, out var page) || page.Scheme != Uri.UriSchemeHttps)
+            throw new InvalidDataException("Некорректный адрес страницы AnimeVost.");
+        var html = await http.GetStringAsync(page, cancellationToken);
+        return ParseEpisodes(html, page);
+    }
+
+    public async Task<IReadOnlyList<StreamQuality>> GetQualitiesAsync(VostEpisode episode, CancellationToken cancellationToken)
+    {
+        if (episode.Provider != "vost" || !Regex.IsMatch(episode.PlaybackId ?? "", @"^\d+$"))
+            throw new InvalidDataException("Для серии отсутствует идентификатор плеера AnimeVost.");
+        var frame = new Uri(Site, "frame5.php?play=" + episode.PlaybackId + "&old=1");
+        var html = await http.GetStringAsync(frame, cancellationToken);
+        var qualities = ParseQualities(html);
+        if (qualities.Count == 0) throw new InvalidDataException("AnimeVost не вернул прямые ссылки на видео.");
+        return qualities;
+    }
+
+    public static IReadOnlyList<VostEpisode> ParseEpisodes(string html, Uri page)
+    {
+        var map = Regex.Match(html, @"\bvar\s+data\s*=\s*(?<json>\{.*?\})\s*;", RegexOptions.Singleline);
+        if (!map.Success) return [];
+        try
+        {
+            // The site writes a JavaScript object, not strict JSON: it may
+            // leave one trailing comma before the closing brace.
+            var json = Regex.Replace(map.Groups["json"].Value, @",\s*}", "}");
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object) return [];
+            return document.RootElement.EnumerateObject()
+                .Where(row => row.Value.ValueKind == JsonValueKind.String && Regex.IsMatch(row.Value.GetString() ?? "", @"^\d+$"))
+                .Select(row => new VostEpisode(row.Name, new Uri(Site, "frame5.php?play=" + row.Value.GetString()), new Uri(Site, "frame5.php?play=" + row.Value.GetString()), null)
+                {
+                    Provider = "vost", PlaybackId = row.Value.GetString(), Referrer = page.AbsoluteUri
+                })
+                .OrderBy(episode => episode.Number).ThenBy(episode => episode.Name, StringComparer.CurrentCulture)
+                .ToList();
+        }
+        catch (JsonException) { return []; }
+    }
+
+    public static IReadOnlyList<StreamQuality> ParseQualities(string html)
+    {
+        var result = new List<StreamQuality>();
+        foreach (Match match in Regex.Matches(html, "<a\\b[^>]*\\bhref\\s*=\\s*['\\\"](?<url>https://[^'\\\"\\s<>]+)['\\\"][^>]*>(?<label>.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        {
+            if (!Uri.TryCreate(WebUtility.HtmlDecode(match.Groups["url"].Value), UriKind.Absolute, out var url) || url.Scheme != Uri.UriSchemeHttps || !url.AbsolutePath.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase)) continue;
+            var label = CleanText(match.Groups["label"].Value);
+            var height = Regex.Match(label, @"(?<height>\d{3,4})\s*[pр]", RegexOptions.IgnoreCase).Groups["height"].Value;
+            var name = height.Length > 0 ? height + "p" : label;
+            if (name.Length > 0 && result.All(item => !string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))) result.Add(new StreamQuality(name, url));
+        }
+        return result.OrderBy(item => int.TryParse(Regex.Match(item.Name, @"\d+").Value, out var height) ? height : 0).ToList();
     }
 
     static string SlugToTitle(string slug) => WebUtility.HtmlDecode(slug.Replace('-', ' '));
     static string CleanText(string value) => WebUtility.HtmlDecode(Regex.Replace(value, "<.*?>", " ")).Replace("  ", " ").Trim();
-    sealed class PlaylistRow { public string? Name { get; set; } public string? Hd { get; set; } public string? Std { get; set; } public string? Preview { get; set; } }
-
     [GeneratedRegex("(?:href=[\\\"'])(?<url>(?:https://v13\\.vost\\.pw)?/tip/[^\\\"']+?/(?<id>\\d+)-(?<slug>[^\\\"'/]+)\\.html)(?:[\\\"'])", RegexOptions.IgnoreCase)]
     private static partial Regex TitleLinkRegex();
 

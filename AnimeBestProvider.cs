@@ -108,7 +108,7 @@ public sealed class AnimeBestProvider
         {
             var file = row.GetProperty("file").GetString();
             if (!Uri.TryCreate(file, UriKind.Absolute, out var uri) || uri.Scheme != "https" || !uri.AbsolutePath.EndsWith(".m3u8")) return null;
-            return new VostEpisode(row.GetProperty("title").GetString() ?? "Серия", uri, uri, null) { IsHls = true, Referrer = Site.AbsoluteUri };
+            return new VostEpisode(row.GetProperty("title").GetString() ?? "Серия", uri, uri, null) { IsHls = true, Provider = "best", Referrer = Site.AbsoluteUri };
         }).Where(e => e is not null).Cast<VostEpisode>().OrderBy(e => e.Number).ToList();
     }
     public async Task<IReadOnlyList<StreamQuality>> GetQualitiesAsync(VostEpisode episode, CancellationToken token)

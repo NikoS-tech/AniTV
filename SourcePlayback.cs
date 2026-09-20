@@ -31,7 +31,7 @@ public partial class MainWindow
 
     async Task<IReadOnlyList<VostEpisode>> FetchEpisodes(Anime anime, AnimeSource source, CancellationToken token)
     {
-        var list = source.Provider == "best" ? await best.GetEpisodesAsync(source, token) : await vost.GetEpisodesAsync(source.Id, token);
+        var list = source.Provider == "best" ? await best.GetEpisodesAsync(source, token) : await vost.GetEpisodesAsync(source, token);
         if (source.Provider == "vost") SourceMatching.MigrateEpisodeKeys(ProgressFor(anime), list);
         source.Available = list.Count;
         ProgressFor(anime).ObserveSource(source, list.Select(e => e.Key));
@@ -58,7 +58,7 @@ public partial class MainWindow
         PlayerLoading.Visibility = Visibility.Visible; PlayerLoadingText.Text = "Загружаем качества видео…";
         try
         {
-            var qualities = await best.GetQualitiesAsync(episode, token);
+            var qualities = await GetEpisodeQualitiesAsync(episode, token);
             token.ThrowIfCancellationRequested();
             if (!ReferenceEquals(mediaRequest,request) || PlayerOverlay.Visibility != Visibility.Visible || windowClosing) return;
             syncingSelectors = true;
@@ -83,6 +83,9 @@ public partial class MainWindow
             if (ReferenceEquals(mediaRequest,request) && !token.IsCancellationRequested) { changingSource = false; QualityBox.IsEnabled = FullscreenQualityBox.IsEnabled = true; }
         }
     }
+
+    Task<IReadOnlyList<StreamQuality>> GetEpisodeQualitiesAsync(VostEpisode episode, CancellationToken token)
+        => episode.Provider == "vost" ? vost.GetQualitiesAsync(episode, token) : best.GetQualitiesAsync(episode, token);
     async void SourceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (syncingSelectors || changingSource || sender is not ComboBox { SelectedItem: AnimeSource source } || selected is null || source.Key == playbackSource?.Key) return;

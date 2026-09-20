@@ -179,6 +179,19 @@ static class SourceTests
         Check(playlist.Count==2 && playlist[0].Key!=playlist[1].Key, "HLS index filenames do not collide between episodes");
         var qualities=AnimeBestProvider.ParseQualities("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1,RESOLUTION=1920x1080\n./1080/index.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=1,RESOLUTION=1280x720\n./720/index.m3u8",new Uri("https://example.org/hls/index.m3u8"));
         Check(qualities.Count==3 && qualities[1].Url.AbsoluteUri=="https://example.org/hls/1080/index.m3u8", "HLS qualities use manifest URLs, including 1080");
+        var vostEpisodes=AnimeVostProvider.ParseEpisodes("<script>var data = {\"1 серия\":\"101\",\"2 серия\":\"202\"};</script>",new Uri("https://v13.vost.pw/tip/tv/1-test.html"));
+        Check(vostEpisodes.Count==2 && vostEpisodes[0].PlaybackId=="101" && vostEpisodes[1].Provider=="vost", "AnimeVost page playlist keeps per-episode player IDs");
+        var vostQualities=AnimeVostProvider.ParseQualities("<a href=\"https://video.example/101.mp4?token=one\">480p (SD)</a><a href=\"https://video.example/720/101.mp4?token=two\">720p (HD)</a>");
+        Check(vostQualities.Select(q=>q.Name).SequenceEqual(new[]{"480p","720p"}), "AnimeVost reserve player exposes signed MP4 qualities");
+        if (args.Contains("--live-vost"))
+        {
+            var liveVost=new AnimeVostProvider();
+            var liveSource=new AnimeSource {Provider="vost",Id="3071",PageUrl="https://v13.vost.pw/tip/tv/3071-xian-ni.html"};
+            var liveEpisodes=await liveVost.GetEpisodesAsync(liveSource);
+            Check(liveEpisodes.Count>=159 && liveEpisodes.All(episode=>episode.Provider=="vost" && episode.PlaybackId is not null), "Live AnimeVost page playlist parses every episode");
+            var liveQualities=await liveVost.GetQualitiesAsync(liveEpisodes[0],default);
+            Check(liveQualities.Any(quality=>quality.Name=="720p") && liveQualities.Any(quality=>quality.Name=="480p"), "Live AnimeVost reserve player returns signed MP4 qualities");
+        }
         if (args.Contains("--live-cache"))
         {
             var liveCacheProvider = new AnimeBestProvider();

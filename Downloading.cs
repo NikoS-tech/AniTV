@@ -28,7 +28,7 @@ public partial class MainWindow
         ShowDownloadNotice($"Подготавливаем: {episode.Name}…");
         try
         {
-            var quality=PlaybackChoice.Maximum(await best.GetQualitiesAsync(episode,CancellationToken.None));
+            var quality=PlaybackChoice.Maximum(await GetEpisodeQualitiesAsync(episode,CancellationToken.None));
             var added=QueueDownload(anime,episode,quality,episode==activeEpisode?Math.Max(0,mediaPlayer.Length/1000d):0);
             ShowDownloadNotice(added?$"Добавлено: {episode.Name} · {quality.Name}":"Серия уже загружена или находится в очереди",true);
         }
@@ -60,7 +60,7 @@ public partial class MainWindow
         var added=0;
         foreach(var episode in list)
         {
-            try { var quality=PlaybackChoice.Maximum(await best.GetQualitiesAsync(episode,CancellationToken.None)); if(QueueDownload(anime,episode,quality,episode==activeEpisode?Math.Max(0,mediaPlayer.Length/1000d):0)) added++; }
+            try { var quality=PlaybackChoice.Maximum(await GetEpisodeQualitiesAsync(episode,CancellationToken.None)); if(QueueDownload(anime,episode,quality,episode==activeEpisode?Math.Max(0,mediaPlayer.Length/1000d):0)) added++; }
             catch { }
         }
         return added;
