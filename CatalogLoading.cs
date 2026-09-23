@@ -83,8 +83,10 @@ public partial class MainWindow
         {
             var batch = await pager.TakeAsync(20, session.Token);
             if (session != catalogCancellation) return null;
-            foreach (var anime in items) Decorate(anime);
-            SaveState();
+            // Keep prefetch strictly off-screen. Refreshing existing Anime
+            // instances emits a blanket PropertyChanged event, which makes the
+            // non-virtualized catalog redraw every poster during each scroll.
+            // New cards are decorated when they are actually appended.
             return batch;
         }
         catch (OperationCanceledException) { return null; }
